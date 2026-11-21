@@ -52,13 +52,20 @@
 
   <section id="panel-ask" role="tabpanel" aria-labelledby="tab-ask" class="panel" hidden>
     <h2>Q&amp;A</h2>
-    <p class="muted">질문을 한국어로 쓰면 AI가 DuckDB SQL을 만들고, 실행 전에 읽기 전용 검사를 거칩니다. 아래 기간, 기준, 비교, 정의 항목이 포함되도록 구체적으로 작성해주세요.</p>
+    <p class="muted">질문을 한국어로 쓰면 AI가 DuckDB SQL을 만들고, 실행 전에 읽기 전용 검사를 거칩니다.<br>아래 기간, 기준, 비교, 정의 항목이 포함되도록 구체적으로 작성해주세요.</p>
 
-    <label class="lbl" for="q-input">질문</label>
-    <textarea id="q-input" rows="6" maxlength="1500" placeholder="예: 2025년 12월 시험 첫 시도 fail률(전체 항목) 알려줘"></textarea>
+    <div class="lbl">1. 조건 고르기</div>
     <div id="builder" class="builder"></div>
+
+    <label class="lbl" for="q-input">2. 질문 <span class="muted">(고른 조건이 문장으로 자동 작성됩니다. 직접 고칠 수도 있습니다)</span></label>
+    <textarea id="q-input" rows="6" maxlength="1500" placeholder="예: 2025년 12월 시험 첫 시도 fail률(전체 항목) 알려줘"></textarea>
+
+    <div class="lbl">3. AI 사전 점검 · 최종 결정 <span class="muted">(문장에 모순이 없는지 AI가 먼저 봅니다)</span></div>
+    <div id="precheck"></div>
+
+    <div class="lbl">4. SQL 만들기</div>
     <div class="row">
-      <button id="q-make" class="btn primary" type="button">SQL 만들기</button>
+      <button id="q-make" class="btn primary" type="button" disabled>SQL 만들기</button>
       <span id="q-status" class="muted" role="status"></span>
     </div>
 
@@ -81,6 +88,7 @@
 
     <div id="res" hidden>
       <h3 class="h3">결과 <span id="res-meta" class="muted"></span></h3>
+      <p id="res-insight" class="insight" hidden></p>
       <div id="res-chart" class="charts" hidden></div>
       <div id="res-table" class="tw"></div>
     </div>
@@ -136,6 +144,7 @@
 <script src="js/erd.js"></script>
 <script src="js/tables.js"></script>
 <script src="js/builder.js"></script>
+<script src="js/precheck.js"></script>
 <script src="js/ask.js"></script>
 <script src="js/app.js"></script>
 <script type="module" src="js/db.js"></script>

@@ -57,9 +57,18 @@
   function show(el, on) { el.hidden = !on; }
 
   // ---- 질문 → SQL ----
+  function decided() { return !!(window.PreCheck && window.PreCheck.isDecided()); }
+  // «최종 결정»을 눌러야 SQL 만들기가 열린다. 질문이 바뀌면 다시 잠긴다.
+  make.disabled = true;
+  window.addEventListener('question-decision', function (e) {
+    make.disabled = !e.detail.decided;
+    status.textContent = e.detail.decided ? '최종 결정됨. «SQL 만들기»를 누르세요.' : '«AI 사전 점검» 후 «최종 결정»을 누르면 SQL 만들기가 열립니다.';
+  });
+
   function ask() {
     var text = q.value.trim();
     if (!text) { status.textContent = '질문을 먼저 써 주세요.'; return; }
+    if (!decided()) { status.textContent = '먼저 «AI 사전 점검»과 «최종 결정»을 눌러 주세요.'; return; }
     make.disabled = true;
     status.textContent = 'AI 가 SQL 을 만드는 중입니다…';
     note.hidden = true;
@@ -75,13 +84,64 @@
         showCheck();
       })
       .catch(function (e) { status.textContent = e.message; })
-      .then(function () { make.disabled = false; });
+      .then(function () { make.disabled = !decided(); });
   }
   make.addEventListener('click', ask);
   q.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) ask(); });
 
+  // ---- 결과에 대한 AI 한 줄 분석 ----
+  // 문장 속 숫자가 결과에서 나온 값(또는 그 값을 %로 바꾼 값)인지 한 번 대조한다. 못 찾으면 참고용 표시만 붙인다.
+  function numsOf(text) {
+    var t = String(text).replace(/\d{4}[-/.]\d{1,2}([-/.]\d{1,2})?/g, ' ').replace(/[A-Za-z]+[-_]?\d+/g, ' ');
+    return (t.match(/\d+(?:,\d{3})*(?:\.\d+)?/g) || []).map(function (s) { return parseFloat(s.replace(/,/g, '')); });
+  }
+  function missingNumbers(line, res) {
+    var ok = {};
+    var add = function (x) { ok[String(Number(x.toFixed(1)))] = 1; ok[String(Number(x.toFixed(0)))] = 1; ok[String(Number(x.toFixed(2)))] = 1; };
+    ok[String(res.rows.length)] = 1; ok[String(res.columns.length)] = 1;
+    res.rows.forEach(function (r) {
+      r.forEach(function (v) {
+        if (typeof v === 'number' && isFinite(v)) { add(v); add(v * 100); }
+        else if (typeof v === 'string') numsOf(v).forEach(function (n) { ok[String(n)] = 1; });
+      });
+    });
+    return numsOf(line).filter(function (n) { return !ok[String(n)] && !ok[String(Number(n.toFixed(1)))]; });
+  }
+  var insightSeq = 0;
+  function showInsight(execSql, res, seq) {
+    var box = $('res-insight');
+    var mine = ++insightSeq;
+    box.hidden = false;
+    box.className = 'insight muted';
+    box.textContent = 'AI 한 줄 분석을 만드는 중입니다…';
+    var rows = res.rows.slice(0, MAX_SEND_ROWS);
+    fetch('/api/insight', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: current.question || q.value.trim() || execSql, sql: execSql, columns: res.columns, rows: rows, extra_tables: extraTables() }) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (r) {
+        if (mine !== insightSeq || seq !== runSeq) return;
+        if (!r.ok) throw new Error(r.j.error || '요청에 실패했습니다.');
+        box.className = 'insight';
+        box.textContent = '';
+        var tag = document.createElement('b'); tag.textContent = 'AI 한 줄 분석 ';
+        box.appendChild(tag);
+        box.appendChild(document.createTextNode(r.j.line));
+        var miss = missingNumbers(r.j.line, { rows: rows, columns: res.columns });
+        var note = document.createElement('span');
+        if (miss.length) { note.className = 'badge warn'; note.textContent = '숫자 확인 필요'; note.title = '결과에서 찾지 못한 숫자: ' + miss.join(', ') + ' (계산해서 만든 값일 수 있습니다)'; }
+        else { note.className = 'badge ok'; note.textContent = '숫자 일치'; note.title = '문장 속 숫자가 모두 결과 표에 있는 값입니다.'; }
+        box.appendChild(note);
+        if (res.rows.length > MAX_SEND_ROWS) { var s = document.createElement('span'); s.className = 'muted small'; s.textContent = ' (앞 ' + MAX_SEND_ROWS + '행만 읽음)'; box.appendChild(s); }
+      })
+      .catch(function (e) {
+        if (mine !== insightSeq || seq !== runSeq) return;
+        box.className = 'insight muted';
+        box.textContent = 'AI 한 줄 분석을 가져오지 못했습니다: ' + (e && e.message ? e.message : e);
+      });
+  }
+
   // ---- 실행 ----
-  function resetResult() { ['res', 'why'].forEach(function (id) { $(id).hidden = true; }); }
+  function resetResult() { ['res', 'why', 'res-insight'].forEach(function (id) { $(id).hidden = true; }); insightSeq++; }
 
   async function runSql() {
     var g = showCheck();
@@ -104,6 +164,7 @@
     window.UI.renderResultTable($('res-table'), res.columns, res.rows, MAX_SHOW_ROWS);
     show($('res'), true);
     if (window.Charts) window.Charts.render($('res-chart'), res.columns, res.rows, null, { controls: true });
+    showInsight(g.sql, res, seq);
     run.disabled = false;
 
     // 여기서부터는 결과를 그대로 둔 채 ①과 ②만 덧붙인다. 어느 쪽이 실패해도 위의 결과는 지워지지 않는다.

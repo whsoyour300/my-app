@@ -200,7 +200,7 @@
         animation: false, responsive: true, maintainAspectRatio: false, indexAxis: horizontal ? 'y' : 'x',
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { display: datasets.length > 1, position: 'top', labels: { color: fg, usePointStyle: true, boxWidth: 8 } },
+          legend: { display: sp.legendPos !== 'hidden' && (datasets.length > 1 || !!sp.legendAlways), position: sp.legendPos && sp.legendPos !== 'hidden' ? sp.legendPos : 'top', labels: { color: fg, usePointStyle: true, boxWidth: 8 } },
           tooltip: { callbacks: { label: function (c) {
             var v = horizontal ? c.parsed.x : c.parsed.y;
             var s = sp.series[c.datasetIndex];
@@ -224,30 +224,79 @@
     box.hidden = true;
   }
 
-  // 사용자가 고른 X · Y · 유형으로 차트 계획을 만든다.
+  // 사용자가 고른 X(여러 개) · Y · 유형 · 범례로 차트 계획을 만든다.
+  //  - X 를 여러 개 고르면 값을 " / " 로 이어 한 라벨로 쓴다(예: 2025-10 / A사).
+  //  - 범례 컬럼을 고르면 그 컬럼의 값마다 선(막대)을 하나씩 만든다. Y 컬럼마다 차트 하나.
+  //    같은 (X, 범례) 조합이 여러 행이면 합으로 묶는다(비율 컬럼은 평균).
   function analyzeSel(columns, rows, sel) {
     var info = colInfo(columns, rows);
-    var xi = sel.x === ROWNO ? -1 : colIndex(columns, sel.x);
-    var all = rows.map(function (r, k) { return xi < 0 ? String(k + 1) : (r[xi] === null || r[xi] === undefined ? '' : String(r[xi])); });
-    var cut = all.length > MAX_LABELS ? '앞 ' + MAX_LABELS + '개 구분만 차트로 그립니다 (전체 ' + all.length + '개).' : '';
-    var labels = all.slice(0, MAX_LABELS);
+    var xs = (sel.xs && sel.xs.length) ? sel.xs : [ROWNO];
+    var xIdx = xs.map(function (x) { return x === ROWNO ? -1 : colIndex(columns, x); }).filter(function (i, k) { return xs[k] === ROWNO || i >= 0; });
+    var li = sel.legend ? colIndex(columns, sel.legend) : -1;
+    if (xIdx.indexOf(li) >= 0) li = -1;
+    var pos = sel.legendPos || 'top';
+    function labelOf(r, k) {
+      return xIdx.map(function (i) { return i < 0 ? String(k + 1) : (r[i] === null || r[i] === undefined ? '' : String(r[i])); }).join(' / ');
+    }
+    var all = rows.map(labelOf);
     var time = looksTime(all);
     var line = sel.type === 'line' || (sel.type !== 'bar' && time);
-    var series = [];
+    var kind = line ? 'line' : 'bar';
+    var ys = [];
     (sel.y || []).forEach(function (nm) {
       var i = colIndex(columns, nm);
-      if (i < 0 || i === xi || !info[i].numeric || series.length >= MAX_SERIES) return;
-      series.push({ name: nm, i: i, rate: info[i].rate, max: info[i].max });
+      if (i < 0 || xIdx.indexOf(i) >= 0 || i === li || !info[i].numeric || ys.length >= MAX_SERIES) return;
+      ys.push({ name: nm, i: i, rate: info[i].rate, max: info[i].max });
     });
-    if (!series.length) return { charts: [], note: '' };
-    var groups = autoGroups(series), dropped = Math.max(0, groups.length - MAX_CHARTS);
-    var charts = groups.slice(0, MAX_CHARTS).map(function (g) {
-      var ss = g.series.map(function (s) { return Object.assign({}, s, { kind: line ? 'line' : 'bar', axis: 'y', data: dataOf(rows, s.i).slice(0, MAX_LABELS) }); });
-      return { title: ss.map(function (s) { return s.name; }).join(' · '), series: ss, percent: g.rate, labels: labels, time: line };
+    if (!ys.length) return { charts: [], note: '' };
+    var notes = [];
+
+    if (li < 0) {
+      var cut = all.length > MAX_LABELS ? '앞 ' + MAX_LABELS + '개 구분만 차트로 그립니다 (전체 ' + all.length + '개).' : '';
+      if (cut) notes.push(cut);
+      var labels = all.slice(0, MAX_LABELS);
+      var groups = autoGroups(ys);
+      if (groups.length > MAX_CHARTS) notes.push('차트는 ' + MAX_CHARTS + '개까지만 그립니다. 나머지는 표에서 확인하세요.');
+      return {
+        note: notes.join(' '),
+        charts: groups.slice(0, MAX_CHARTS).map(function (g) {
+          var ss = g.series.map(function (s) { return Object.assign({}, s, { kind: kind, axis: 'y', data: dataOf(rows, s.i).slice(0, MAX_LABELS) }); });
+          return { title: ss.map(function (s) { return s.name; }).join(' · '), series: ss, percent: g.rate, labels: labels, time: line, legendPos: pos };
+        })
+      };
+    }
+
+    // ----- 범례 컬럼으로 나눈 시리즈 -----
+    var labelList = [], labelSeen = {}, legList = [], legSeen = {};
+    rows.forEach(function (r, k) {
+      var lb = all[k], lg = r[li] === null || r[li] === undefined ? '(없음)' : String(r[li]);
+      if (!labelSeen[lb]) { labelSeen[lb] = true; labelList.push(lb); }
+      if (!legSeen[lg]) { legSeen[lg] = true; legList.push(lg); }
     });
-    var note = cut;
-    if (dropped) note += (note ? ' ' : '') + '차트는 ' + MAX_CHARTS + '개까지만 그립니다. 나머지는 표에서 확인하세요.';
-    return { charts: charts, note: note };
+    if (labelList.length > MAX_LABELS) { notes.push('앞 ' + MAX_LABELS + '개 구분만 차트로 그립니다 (전체 ' + labelList.length + '개).'); labelList = labelList.slice(0, MAX_LABELS); }
+    if (legList.length > 12) { notes.push('범례는 앞 12개 값만 그립니다 (전체 ' + legList.length + '개).'); legList = legList.slice(0, 12); }
+    var merged = false;
+    var charts = ys.slice(0, MAX_CHARTS).map(function (y) {
+      var acc = {};
+      rows.forEach(function (r, k) {
+        var lb = all[k], lg = r[li] === null || r[li] === undefined ? '(없음)' : String(r[li]);
+        var v = r[y.i];
+        if (!isNum(v)) return;
+        var key = lb + '\u0001' + lg, a = acc[key] || (acc[key] = { sum: 0, n: 0 });
+        a.sum += v; a.n++;
+        if (a.n > 1) merged = true;
+      });
+      var ss = legList.map(function (lg) {
+        return {
+          name: lg, i: y.i, rate: y.rate, max: y.max, kind: kind, axis: 'y',
+          data: labelList.map(function (lb) { var a = acc[lb + '\u0001' + lg]; return a ? (y.rate ? a.sum / a.n : a.sum) : null; })
+        };
+      });
+      return { title: y.name + ' (범례: ' + sel.legend + ')', series: ss, percent: y.rate, labels: labelList, time: line, legendPos: pos, legendAlways: true };
+    });
+    if (ys.length > MAX_CHARTS) notes.push('차트는 ' + MAX_CHARTS + '개까지만 그립니다. 나머지는 표에서 확인하세요.');
+    if (merged) notes.push('같은 X · 범례 조합에 여러 행이 있어 합으로 묶었습니다(비율 컬럼은 평균).');
+    return { charts: charts, note: notes.join(' ') };
   }
 
   async function paint(box, outEl, plan, seq) {
@@ -285,55 +334,86 @@
 
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
 
-  // X · Y · 유형을 고르는 줄. 컬럼 이름은 AI 나 파일에서 올 수 있으니 textContent 로만 넣는다.
+  // X(여러 개) · Y(여러 개) · 유형 · 범례를 고르는 줄. 컬럼 이름은 AI 나 파일에서 올 수 있으니 textContent 로만 넣는다.
   function buildControls(box, outEl, columns, rows, seq, state) {
     var info = colInfo(columns, rows);
     var ctl = el('div', 'chart-ctl');
-    var xSel = el('select'), tSel = el('select'), yBox = el('div', 'chip-row');
-    xSel.setAttribute('aria-label', 'X축');
-    tSel.setAttribute('aria-label', '차트 유형');
+    var xBox = el('div', 'chip-row'), yBox = el('div', 'chip-row');
+    var tSel = el('select'), lSel = el('select'), pSel = el('select');
+    tSel.setAttribute('aria-label', '차트 유형'); lSel.setAttribute('aria-label', '범례 기준'); pSel.setAttribute('aria-label', '범례 위치');
     var opt = function (sel, v, t) { var o = el('option', null, t); o.value = v; sel.appendChild(o); };
-    opt(xSel, ROWNO, '행 번호');
-    columns.forEach(function (c) { opt(xSel, c, c); });
     [['auto', '자동'], ['bar', '막대'], ['line', '꺾은선']].forEach(function (t) { opt(tSel, t[0], t[1]); });
-    xSel.value = state.x; tSel.value = state.type;
+    [['top', '위'], ['bottom', '아래'], ['right', '오른쪽'], ['left', '왼쪽'], ['hidden', '숨김']].forEach(function (t) { opt(pSel, t[0], t[1]); });
+    tSel.value = state.type; pSel.value = state.legendPos;
 
-    function field(label, node) { var f = el('label', 'ctl-field'); f.appendChild(el('span', 'ctl-lbl', label)); f.appendChild(node); return f; }
-    ctl.appendChild(field('X축', xSel));
+    function field(label, node, cls) { var f = el('label', 'ctl-field' + (cls ? ' ' + cls : '')); f.appendChild(el('span', 'ctl-lbl', label)); f.appendChild(node); return f; }
+    function group(label, node, cls) { var f = el('div', 'ctl-field' + (cls ? ' ' + cls : '')); f.appendChild(el('span', 'ctl-lbl', label)); f.appendChild(node); return f; }
+    ctl.appendChild(group('X축 (여러 개 선택하면 이어서 한 라벨)', xBox, 'wide'));
+    ctl.appendChild(group('Y축 (숫자 컬럼, 여러 개 선택)', yBox, 'wide'));
     ctl.appendChild(field('유형', tSel));
-    var yWrap = el('div', 'ctl-field wide'); yWrap.appendChild(el('span', 'ctl-lbl', 'Y축 (숫자 컬럼, 여러 개 선택)')); yWrap.appendChild(yBox);
-    ctl.appendChild(yWrap);
+    ctl.appendChild(field('범례 기준', lSel));
+    ctl.appendChild(field('범례 위치', pSel));
     var reset = el('button', 'btn small-btn', '자동으로 되돌리기'); reset.type = 'button';
     ctl.appendChild(reset);
 
+    function redraw() { paint(box, outEl, analyzeSel(columns, rows, state), seq); }
+    function chip(parent, name, checked, onChange) {
+      var c = el('label', 'chip');
+      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = checked;
+      cb.addEventListener('change', function () { onChange(cb.checked); });
+      c.appendChild(cb); c.appendChild(el('span', null, name === ROWNO ? '행 번호' : name)); parent.appendChild(c);
+    }
+    function drawLegendOptions() {
+      lSel.textContent = '';
+      opt(lSel, '', 'Y 컬럼 이름 (기본)');
+      columns.forEach(function (c) { opt(lSel, c, c + ' 의 값별'); });
+      lSel.value = state.legend || '';
+      state.legend = lSel.value;
+    }
+    function drawX() {
+      xBox.textContent = '';
+      [ROWNO].concat(columns).forEach(function (c) {
+        if (c === state.legend) return;
+        chip(xBox, c, state.xs.indexOf(c) >= 0, function (on) {
+          state.xs = state.xs.filter(function (n) { return n !== c; });
+          if (on) state.xs.push(c);
+          if (!state.xs.length) state.xs = [ROWNO];       // X 가 하나도 없으면 행 번호
+          drawX(); drawY(); redraw();
+        });
+      });
+    }
     function drawY() {
       yBox.textContent = '';
       columns.forEach(function (c, i) {
-        if (!info[i].numeric || c === state.x) return;
-        var chip = el('label', 'chip');
-        var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = state.y.indexOf(c) >= 0;
-        cb.addEventListener('change', function () {
+        if (!info[i].numeric || state.xs.indexOf(c) >= 0 || c === state.legend) return;
+        chip(yBox, c, state.y.indexOf(c) >= 0, function (on) {
           state.y = state.y.filter(function (n) { return n !== c; });
-          if (cb.checked) state.y.push(c);
+          if (on) state.y.push(c);
           redraw();
         });
-        chip.appendChild(cb); chip.appendChild(el('span', null, c)); yBox.appendChild(chip);
       });
       if (!yBox.childNodes.length) yBox.appendChild(el('span', 'muted small', '고를 수 있는 숫자 컬럼이 없습니다.'));
     }
-    function redraw() { paint(box, outEl, analyzeSel(columns, rows, state), seq); }
-    xSel.addEventListener('change', function () { state.x = xSel.value; state.y = state.y.filter(function (n) { return n !== state.x; }); drawY(); redraw(); });
     tSel.addEventListener('change', function () { state.type = tSel.value; redraw(); });
+    pSel.addEventListener('change', function () { state.legendPos = pSel.value; redraw(); });
+    lSel.addEventListener('change', function () {
+      state.legend = lSel.value;
+      // 범례로 고른 컬럼은 X 와 Y 에서 뺀다(예: 월 / 시험항목 중 시험항목을 범례로 하면 X 는 월만 남는다).
+      state.y = state.y.filter(function (n) { return n !== state.legend; });
+      if (state.legend) { state.xs = state.xs.filter(function (n) { return n !== state.legend; }); if (!state.xs.length) state.xs = [ROWNO]; }
+      drawX(); drawY(); redraw();
+    });
     reset.addEventListener('click', function () {
       var d = state.initial;
-      state.x = d.x; state.y = d.y.slice(); state.type = 'auto'; xSel.value = state.x; tSel.value = 'auto'; drawY();
+      state.xs = d.xs.slice(); state.y = d.y.slice(); state.type = 'auto'; state.legend = ''; state.legendPos = 'top';
+      tSel.value = 'auto'; pSel.value = 'top'; drawLegendOptions(); drawX(); drawY();
       paint(box, outEl, d.plan, seq);
     });
-    drawY();
+    drawLegendOptions(); drawX(); drawY();
     return ctl;
   }
 
-  // opts.controls: true 이면 X · Y · 유형을 고르는 줄을 차트 위에 붙인다(Q&A 탭).
+  // opts.controls: true 이면 X · Y · 유형 · 범례를 고르는 줄을 차트 위에 붙인다(Q&A 탭).
   async function render(box, columns, rows, hints, opts) {
     var seq = (seqs.get(box) || 0) + 1;
     seqs.set(box, seq);
@@ -348,15 +428,15 @@
     box.hidden = false;
     var outEl = el('div', 'charts-out');
     if (withCtl) {
-      // 처음 모양은 자동 선택 그대로. 기본 X 는 라벨이 된 첫 컬럼, 기본 Y 는 자동으로 그린 컬럼들.
+      // 처음 모양은 자동 선택 그대로. 기본 X 는 라벨이 된 컬럼들, 기본 Y 는 자동으로 그린 컬럼들.
       var li = labelsOf(columns, rows, info);
-      var x = li.length ? columns[li[0]] : ROWNO;
+      var xs = li.length ? li.map(function (i) { return columns[i]; }) : [ROWNO];
       var ys = [];
-      plan.charts.forEach(function (sp) { sp.series.forEach(function (s) { if (!sp.oneRow && ys.indexOf(s.name) < 0 && s.name !== x) ys.push(s.name); }); });
-      if (!ys.length) info.forEach(function (c, i) { if (c.numeric && columns[i] !== x && ys.length < 3) ys.push(columns[i]); });
-      var state = { x: x, y: ys.slice(), type: 'auto', initial: null };
+      plan.charts.forEach(function (sp) { sp.series.forEach(function (s) { if (!sp.oneRow && ys.indexOf(s.name) < 0 && xs.indexOf(s.name) < 0) ys.push(s.name); }); });
+      if (!ys.length) info.forEach(function (c, i) { if (c.numeric && xs.indexOf(columns[i]) < 0 && ys.length < 3) ys.push(columns[i]); });
+      var state = { xs: xs, y: ys.slice(), type: 'auto', legend: '', legendPos: 'top', initial: null };
       if (!plan.charts.length) plan = analyzeSel(columns, rows, state);
-      state.initial = { x: x, y: ys.slice(), plan: plan };
+      state.initial = { xs: xs.slice(), y: ys.slice(), plan: plan };
       box.appendChild(buildControls(box, outEl, columns, rows, seq, state));
     }
     box.appendChild(outEl);

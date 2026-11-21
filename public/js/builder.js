@@ -75,13 +75,13 @@
     var lines = [
       '기간: ' + st.from + ' ~ ' + st.to + ' (양 끝 날짜 포함, 시험일 test_date 기준)',
       '기준: ' + basis,
-      '정의: ' + label + ' = ' + N.ko + '(' + N.def + ') ÷ ' + D.ko + '(' + D.def + ')',
       '비교: ' + cmp.text,
+      '정의: ' + label + ' = ' + N.ko + '(' + N.def + ') ÷ ' + D.ko + '(' + D.def + ')',
       '위 조건으로 구해줘.'
     ];
     var warn = '';
     var hasEquip = st.dims.some(function (k) { return k === 'equip_id' || k === 'equip_type' || k === 'vendor'; });
-    if (hasEquip && !stepFixed) warn = '설비로 나눌 때는 «공정»을 한 공정으로 정해 두면 같은 시험이 여러 공정에 겹쳐 세어지지 않아 더 정확합니다.';
+    if (hasEquip && st.dims.indexOf('step') < 0) warn = '설비로 나눌 때는 «공정»을 한 공정으로 정해 두면 같은 시험이 여러 공정에 겹쳐 세어지지 않아 더 정확합니다.';
     return { text: lines.join('\n'), warn: warn };
   }
 
@@ -171,6 +171,7 @@
       if (dirty && !force) { msg.textContent = '직접 고친 문장이라 옵션을 바꿔도 덮어쓰지 않습니다. 옵션대로 다시 쓰려면 «문장 다시 만들기»를 누르세요.'; return; }
       q.value = r.text;
       dirty = false;
+      q.dispatchEvent(new CustomEvent('builder-write'));   // 이전 점검 · 최종 결정을 무효로 한다
       msg.textContent = r.warn || '옵션대로 문장을 만들었습니다. 필요하면 질문 칸에서 고친 뒤 «SQL 만들기»를 누르세요.';
       if (r.warn) msg.className = 'small b-msg warn';
     }
@@ -206,6 +207,7 @@
         var mn = r.rows[0] && r.rows[0][0], mx = r.rows[0] && r.rows[0][1];
         if (mn && mx) {
           dateHint.textContent = '지금 올라와 있는 시험 데이터 범위: ' + mn + ' ~ ' + mx;
+          root.Builder.range = { min: String(mn).slice(0, 10), max: String(mx).slice(0, 10) };
           if (!touchedDates) { st.to = String(mx).slice(0, 10); st.from = addMonths(st.to, -3); }
         }
       } catch (e) { dateHint.textContent = ''; }
@@ -223,7 +225,7 @@
     loadFromData();
   }
 
-  root.Builder = { compose: compose, addMonths: addMonths, DIMS: DIMS, CMPS: CMPS, NUMS: NUMS, DENS: DENS, COMBOS: COMBOS };
+  root.Builder = { range: null, compose: compose, addMonths: addMonths, DIMS: DIMS, CMPS: CMPS, NUMS: NUMS, DENS: DENS, COMBOS: COMBOS };
   if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
   }

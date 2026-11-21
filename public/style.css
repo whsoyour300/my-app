@@ -185,4 +185,19 @@ input[type="text"]:focus-visible{outline:2px solid var(--accent);outline-offset:
 .b-msg{flex:1 1 280px}
 @media (max-width:760px){.builder-card{grid-template-columns:minmax(0,1fr)}}
 
+/* 사전 점검 · 한 줄 분석 */
+.check-box{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 18px;display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.check-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.check-sum{font-size:15px}
+.check-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14.5px}
+.check-list li.error b{color:var(--warn)}
+.check-list li.warn b{color:var(--warn)}
+.check-list li.info b{color:var(--muted)}
+.check-text{font-family:var(--font);font-size:14.5px;white-space:pre-wrap;background:var(--bg);border-radius:12px;padding:10px 14px;margin:0}
+.check-done{margin:0;color:var(--ok);font-weight:600}
+.insight{margin:0 0 6px;background:var(--accent-soft);border-radius:12px;padding:10px 16px;font-size:15px;display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.insight.muted{background:var(--bg)}
+.insight[hidden]{display:none}
+.insight b{color:var(--accent)}
+
 @media (max-width:560px){body{font-size:15px}h1{font-size:21px}}
