@@ -333,7 +333,7 @@
     return ctl;
   }
 
-  // opts.controls: true 이면 X · Y · 유형을 고르는 줄을 차트 위에 붙인다(묻기 탭).
+  // opts.controls: true 이면 X · Y · 유형을 고르는 줄을 차트 위에 붙인다(Q&A 탭).
   async function render(box, columns, rows, hints, opts) {
     var seq = (seqs.get(box) || 0) + 1;
     seqs.set(box, seq);

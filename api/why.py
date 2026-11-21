@@ -55,7 +55,7 @@ class handler(BaseHTTPRequestHandler):
             sql = body.get("sql")
             columns = body.get("columns")
             rows = body.get("rows")
-            if not isinstance(question, str) or not question.strip() or len(question) > 500:
+            if not isinstance(question, str) or not question.strip() or len(question) > 1500:
                 raise c.ApiError(400, "question 이 비었거나 너무 깁니다.")
             if not isinstance(sql, str) or not sql.strip() or len(sql) > 20000:
                 raise c.ApiError(400, "sql 이 비었거나 너무 깁니다.")

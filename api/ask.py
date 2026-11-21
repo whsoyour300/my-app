@@ -20,7 +20,15 @@ SYSTEM = """너는 DuckDB SQL 을 쓰는 데이터 분석 도우미다. 아래 s
 - schema.metrics 의 지표 정의와 schema.rules 를 따른다. 질문에 지표 이름이 있으면 그 정의대로 센다.
 - 사용자가 기간만 말하고 기준 날짜 컬럼을 말하지 않으면 schema.rules 의 규칙에 따라 고른다.
 - 결과 컬럼에는 사람이 읽을 수 있는 한국어 별칭을 붙이고, 비율은 소수 넷째 자리까지 ROUND 한다.
-- 질문에 '이유', '원인', '쪼개서', '~별로' 같은 말이 있어도 이 SQL 은 질문이 가리키는 결과 값 자체(예: 기간 전체의 fail률)만 구한다. 쪼개기는 다음 단계에서 따로 하므로 여기서는 하지 않는다.
+- 질문에 '이유', '원인', '쪼개서' 같은 말이 있어도, 아래의 «기준:» 줄이 없으면 이 SQL 은 질문이 가리키는 결과 값 자체(예: 기간 전체의 fail률)만 구한다. 쪼개기는 다음 단계에서 따로 한다.
+- 질문에 '기간:', '기준:', '정의:', '비교:' 줄이 있으면 그대로 SQL 에 반영한다.
+  · 기간: 양 끝 날짜를 포함한다. 시험일(test_date) >= FROM AND test_date < TO 의 다음 날.
+  · 기준: 줄에 적힌 컬럼으로 GROUP BY 하고, 그 컬럼을 결과에 넣는다. '나누지 않고 전체로'이면 한 행만 구한다.
+    product 는 lots, equip_id · equip_type · vendor 는 equipment, step 은 process_runs 에서 온다. 시험 쪽을 로트 × 시험 항목 단위로 먼저 집계한 뒤 조인해 행이 불어나지 않게 한다.
+    설비 컬럼으로 나누는데 공정(step) 값이 정해져 있지 않으면 process_runs 를 step 별로 붙이고 step 을 결과에 함께 넣는다(같은 시험이 여러 공정에 겹쳐 세어지지 않게).
+    "공정(step) = '식각' 공정만"이면 process_runs 에서 그 step 한 행만 붙인다.
+  · 정의: 분자 ÷ 분모를 괄호 안의 조건대로 센다. 분모가 0 이면 NULL 로 둔다(NULLIF).
+  · 비교: 요청한 비교 컬럼(전월 대비 증감, 직전 같은 길이 기간 대비, 전체 평균과의 차이, 순위)을 결과에 더한다.
 
 답은 JSON 객체 하나로만 한다:
 {"sql": "<DuckDB SQL>",
@@ -49,7 +57,7 @@ def clean_basis(b):
         return None
     return {k: clean_list(b.get(k)) for k in ("tables", "conditions", "metrics")}
 
-MAX_QUESTION = 500
+MAX_QUESTION = 1500
 
 
 class handler(BaseHTTPRequestHandler):

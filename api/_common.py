@@ -6,6 +6,7 @@ AI 에 보내는 것은 질문 · 테이블 설명(schema.json) · 집계 결과
 import json
 import os
 import urllib.error
+import time
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -109,25 +110,36 @@ def call_gemini(system, user, timeout=40):
         "contents": [{"role": "user", "parts": [{"text": user}]}],
         "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
     }
-    req = urllib.request.Request(
-        GEMINI_URL.format(model=model_name()),
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json", "x-goog-api-key": key},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            data = json.loads(r.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        detail = ""
+    # 모델이 몰려 있을 때의 일시 오류(429 · 5xx)는 짧게 쉬었다가 두 번까지 다시 시도한다.
+    # Vercel 함수 제한(30초) 안에 끝나도록 전체 시간을 25초로 묶는다.
+    deadline = time.time() + 25
+    delays = [1.5, 3.0]
+    attempt = 0
+    while True:
+        req = urllib.request.Request(
+            GEMINI_URL.format(model=model_name()),
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "x-goog-api-key": key},
+            method="POST",
+        )
         try:
-            detail = json.loads(e.read().decode("utf-8")).get("error", {}).get("message", "")
-        except Exception:
-            pass
-        detail = detail.replace(key, "***")
-        raise ApiError(502, "AI 호출 실패 (%s, 모델 %s): %s" % (e.code, model_name(), detail[:300]))
-    except (urllib.error.URLError, TimeoutError) as e:
-        raise ApiError(502, "AI 서버에 연결하지 못했습니다: %s" % str(e)[:200])
+            with urllib.request.urlopen(req, timeout=max(5, min(timeout, deadline - time.time()))) as r:
+                data = json.loads(r.read().decode("utf-8"))
+            break
+        except urllib.error.HTTPError as e:
+            detail = ""
+            try:
+                detail = json.loads(e.read().decode("utf-8")).get("error", {}).get("message", "")
+            except Exception:
+                pass
+            detail = detail.replace(key, "***")
+            if e.code in (429, 500, 502, 503, 504) and attempt < len(delays) and time.time() + delays[attempt] < deadline - 5:
+                time.sleep(delays[attempt])
+                attempt += 1
+                continue
+            raise ApiError(502, "AI 호출 실패 (%s, 모델 %s): %s" % (e.code, model_name(), detail[:300]))
+        except (urllib.error.URLError, TimeoutError) as e:
+            raise ApiError(502, "AI 서버에 연결하지 못했습니다: %s" % str(e)[:200])
     try:
         text = data["candidates"][0]["content"]["parts"][0]["text"]
         return json.loads(text)

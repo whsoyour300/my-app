@@ -188,7 +188,7 @@
     $('saved-count').textContent = saved.length ? '(' + saved.length + '개)' : '';
     $('saved-download').disabled = !saved.length;
     if (!saved.length) {
-      box.appendChild(el('div', 'empty', '아직 저장한 질문이 없습니다. 묻기 탭에서 SQL 을 만든 뒤 이름을 붙여 저장하세요.'));
+      box.appendChild(el('div', 'empty', '아직 저장한 질문이 없습니다. Q&A 탭에서 SQL 을 만든 뒤 이름을 붙여 저장하세요.'));
       return;
     }
     saved.forEach(function (s) {

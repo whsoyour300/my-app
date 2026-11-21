@@ -15,7 +15,7 @@
   </div></div>
   <nav class="tabs" role="tablist" aria-label="화면 선택">
     <button role="tab" id="tab-ready" aria-controls="panel-ready" aria-selected="true" data-tab="ready">준비된 질문</button>
-    <button role="tab" id="tab-ask" aria-controls="panel-ask" aria-selected="false" tabindex="-1" data-tab="ask">묻기</button>
+    <button role="tab" id="tab-ask" aria-controls="panel-ask" aria-selected="false" tabindex="-1" data-tab="ask">Q&amp;A</button>
     <button role="tab" id="tab-tables" aria-controls="panel-tables" aria-selected="false" tabindex="-1" data-tab="tables">테이블</button>
     <button role="tab" id="tab-files" aria-controls="panel-files" aria-selected="false" tabindex="-1" data-tab="files">내 파일</button>
   </nav>
@@ -30,16 +30,17 @@
 
     <h3 class="h3 saved-h">저장한 질문 <span id="saved-count" class="muted"></span>
       <button id="saved-download" class="btn" type="button" disabled>JSON 내려받기</button></h3>
-    <p class="muted small">묻기 탭에서 이름을 붙여 저장한 질문입니다. 이 브라우저(localStorage)에 남고, JSON 파일로도 내려받을 수 있습니다.</p>
+    <p class="muted small">Q&amp;A 탭에서 이름을 붙여 저장한 질문입니다. 이 브라우저(localStorage)에 남고, JSON 파일로도 내려받을 수 있습니다.</p>
     <div id="saved-list" class="plist"></div>
   </section>
 
   <section id="panel-ask" role="tabpanel" aria-labelledby="tab-ask" class="panel" hidden>
-    <h2>묻기</h2>
-    <p class="muted">질문을 한국어로 쓰면 AI가 DuckDB SQL을 만들고, 실행 전에 읽기 전용 검사를 거칩니다.</p>
+    <h2>Q&amp;A</h2>
+    <p class="muted">질문을 한국어로 쓰면 AI가 DuckDB SQL을 만들고, 실행 전에 읽기 전용 검사를 거칩니다. 아래 기간, 기준, 비교, 정의 항목이 포함되도록 구체적으로 작성해주세요.</p>
 
     <label class="lbl" for="q-input">질문</label>
-    <textarea id="q-input" rows="2" maxlength="500" placeholder="예: 2025년 12월 시험 첫 시도 fail률(전체 항목) 알려줘"></textarea>
+    <textarea id="q-input" rows="6" maxlength="1500" placeholder="예: 2025년 12월 시험 첫 시도 fail률(전체 항목) 알려줘"></textarea>
+    <div id="builder" class="builder"></div>
     <div class="row">
       <button id="q-make" class="btn primary" type="button">SQL 만들기</button>
       <span id="q-status" class="muted" role="status"></span>
@@ -133,6 +134,7 @@
 <script src="js/files.js"></script>
 <script src="js/erd.js"></script>
 <script src="js/tables.js"></script>
+<script src="js/builder.js"></script>
 <script src="js/ask.js"></script>
 <script src="js/app.js"></script>
 <script type="module" src="js/db.js"></script>

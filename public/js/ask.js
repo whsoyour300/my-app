@@ -1,4 +1,4 @@
-// 묻기 탭: 질문 → /api/ask → SQL 검사 → 실행(DuckDB, 브라우저 안) → ① 산출 근거 + ② 원인 한 단계.
+// Q&A 탭: 질문 → /api/ask → SQL 검사 → 실행(DuckDB, 브라우저 안) → ① 산출 근거 + ② 원인 한 단계.
 // 서버로 가는 것은 질문 · SQL · 집계 결과(50행 이하)뿐이다. 원본 행은 보내지 않는다.
 (function () {
   var $ = function (id) { return document.getElementById(id); };
