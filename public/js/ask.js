@@ -49,8 +49,8 @@
     });
     if (!r.ok) { saveStatus.textContent = r.reason; saveStatus.className = 'warn'; return; }
     saveStatus.className = 'muted';
-    saveStatus.textContent = (r.replaced ? '같은 이름이 있어 바꿔 저장했습니다.' : '저장했습니다.') +
-      (r.stored ? ' 준비된 질문 탭에서 다시 계산할 수 있습니다.' : ' 이 브라우저에는 저장하지 못했습니다. 준비된 질문 탭의 JSON 내려받기를 쓰세요.');
+    saveStatus.textContent = (r.replaced ? '같은 이름이 있어 바꿔 등록했습니다.' : '등록했습니다.') +
+      (r.stored ? ' 위의 «자주 쓰는 질문» 목록에 «내 질문»으로 나타나고, 준비된 질문 탭에서도 다시 계산할 수 있습니다.' : ' 이 브라우저에는 저장하지 못했습니다. «내보내기(JSON)»를 쓰세요.');
   });
 
   function badge(el, level, text) { el.className = 'badge ' + level; el.textContent = text; }
@@ -174,6 +174,23 @@
     await renderCause(g.sql, res, seq);
   }
   run.addEventListener('click', runSql);
+
+  // 자주 쓰는 질문: 저장된 SQL 을 AI 를 거치지 않고 그대로 실행한다(같은 데이터에서는 같은 값).
+  window.QA = {
+    runStored: function (item) {
+      var text = item.question || item.title || '';
+      q.value = text;
+      q.dispatchEvent(new Event('input', { bubbles: true }));   // 이전 사전 점검 · 최종 결정은 무효
+      sql.value = item.sql;
+      current = { question: text, genSql: item.sql, basis: item.basis || null };
+      note.textContent = '자주 쓰는 질문 «' + (item.title || '') + '»: 저장된 SQL 을 AI 를 거치지 않고 그대로 실행합니다. 같은 데이터에서는 같은 값이 나옵니다.';
+      note.hidden = false;
+      status.textContent = '';
+      showCheck();
+      runSql();
+      setTimeout(function () { var r = $('res'); if (r && !r.hidden) r.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 600);
+    }
+  };
 
   // ---- ① 산출 근거 ----
   function renderBasis(execSql, schema) {

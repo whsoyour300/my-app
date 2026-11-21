@@ -25,6 +25,7 @@
     try { localStorage.setItem(KEY, JSON.stringify(saved)); return true; } catch (e) { return false; }
   }
   saved = load();
+  var idSeq = 0;
 
   var Saved = {
     list: function () { return saved.slice(); },
@@ -36,9 +37,9 @@
       var g = Guard.checkSql(item.sql);
       if (!g.ok) return { ok: false, reason: '저장하지 않았습니다. ' + g.reason };
       var rec = {
-        id: 'saved-' + Date.now().toString(36),
+        id: 'saved-' + Date.now().toString(36) + (++idSeq).toString(36),
         name: name,
-        question: String(item.question || '').slice(0, 500),
+        question: String(item.question || '').slice(0, 1500),
         sql: g.sql,
         basis: item.basis || null,
         savedAt: UI.stamp()
@@ -58,6 +59,21 @@
     },
     exportJson: function () {
       return JSON.stringify({ version: 1, exportedAt: UI.stamp(), questions: saved }, null, 2);
+    },
+    // 내려받은 JSON 을 가져온다. 하나씩 같은 읽기 전용 검사를 거치고, 같은 이름은 바꾼다.
+    importJson: function (text) {
+      var data;
+      try { data = JSON.parse(text); } catch (e) { return { ok: false, reason: 'JSON 형식이 아닙니다.' }; }
+      var list = Array.isArray(data) ? data : (data && Array.isArray(data.questions) ? data.questions : null);
+      if (!list) return { ok: false, reason: 'questions 목록이 없습니다.' };
+      var added = 0, replaced = 0, skipped = [];
+      list.slice(0, 200).forEach(function (x) {
+        if (!validItem(x)) { skipped.push('(형식이 맞지 않는 항목)'); return; }
+        var r = Saved.add({ name: x.name, question: x.question, sql: x.sql, basis: x.basis });
+        if (r.ok) { if (r.replaced) replaced++; else added++; }
+        else skipped.push(String(x.name).slice(0, 30) + ': ' + r.reason.replace('저장하지 않았습니다. ', ''));
+      });
+      return { ok: true, added: added, replaced: replaced, skipped: skipped };
     }
   };
 
@@ -186,6 +202,7 @@
     box.textContent = '';
     saved.forEach(function (s) { delete cards[s.id]; });
     $('saved-count').textContent = saved.length ? '(' + saved.length + '개)' : '';
+    window.dispatchEvent(new CustomEvent('saved-changed'));
     $('saved-download').disabled = !saved.length;
     if (!saved.length) {
       box.appendChild(el('div', 'empty', '아직 저장한 질문이 없습니다. Q&A 탭에서 SQL 을 만든 뒤 이름을 붙여 저장하세요.'));
@@ -245,6 +262,7 @@
     if (window.Db) setDb(window.Db.state);
     api.items = presets;
     api.ready = true;
+    window.dispatchEvent(new CustomEvent('presets-ready'));
   }).catch(function (e) {
     api.error = e.message;
     $('preset-list').appendChild(el('div', 'empty', '준비된 질문을 읽지 못했습니다: ' + e.message));

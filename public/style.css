@@ -205,4 +205,19 @@ input[type="text"]:focus-visible{outline:2px solid var(--accent);outline-offset:
 .check-sub.fix .sub-tag{background:var(--accent-soft);color:var(--accent)}
 .check-facts{border-top:1px solid var(--line);padding-top:8px}
 .check-facts .lbl{margin:0 0 4px;font-size:14px}
+/* 자주 쓰는 질문 */
+.freq{display:flex;flex-direction:column;gap:8px}
+.freq input[type="text"]{flex:none;width:100%;max-width:420px}
+.freq-list{max-height:300px;overflow-y:auto;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.freq-list:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.freq-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.freq-row:last-child{border-bottom:none}
+.freq-main{flex:1;min-width:0}
+.freq-title{font-weight:600;font-size:15px}
+.freq-sub{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.freq-list .empty{margin:12px;padding:16px}
+.badge.mine{background:var(--accent-soft);color:var(--accent)}
+.reg-box{margin-top:20px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.reg-box .h3{margin:0}
+
 @media (max-width:560px){body{font-size:15px}h1{font-size:21px}}

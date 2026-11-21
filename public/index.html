@@ -54,6 +54,12 @@
     <h2>Q&amp;A</h2>
     <p class="muted">질문을 한국어로 쓰면 AI가 DuckDB SQL을 만들고, 실행 전에 읽기 전용 검사를 거칩니다.<br>아래 기간, 기준, 비교, 정의 항목이 포함되도록 구체적으로 작성해주세요.</p>
 
+    <div class="lbl">자주 쓰는 질문 <span id="freq-count" class="muted"></span> <span class="muted">(고르면 저장된 SQL을 그대로 실행해 누가 돌려도 같은 값이 나옵니다)</span></div>
+    <div class="freq">
+      <input id="freq-filter" type="text" placeholder="질문 찾기 (이름이나 문장의 일부)" aria-label="자주 쓰는 질문 찾기">
+      <div id="freq-list" class="freq-list" role="list" tabindex="0" aria-label="자주 쓰는 질문 목록"></div>
+    </div>
+
     <div class="lbl">1. 조건 고르기</div>
     <div id="builder" class="builder"></div>
 
@@ -79,13 +85,6 @@
       <span id="db-status" class="muted"></span>
     </div>
 
-    <div class="row save-row">
-      <label class="lbl" for="save-name">저장</label>
-      <input id="save-name" type="text" maxlength="60" placeholder="이름을 붙여 저장 (예: 10월 fail률 쪼개기)">
-      <button id="sql-save" class="btn" type="button">이름 붙여 저장</button>
-      <span id="save-status" class="muted" role="status"></span>
-    </div>
-
     <div id="res" hidden>
       <h3 class="h3">결과 <span id="res-meta" class="muted"></span></h3>
       <p id="res-insight" class="insight" hidden></p>
@@ -108,6 +107,23 @@
         <details id="cause-sqlbox" hidden><summary>쪼개기 SQL 보기</summary><pre id="cause-sql" class="sqlpre"></pre></details>
       </section>
     </div>
+
+    <section class="reg-box" aria-labelledby="reg-h">
+      <h3 id="reg-h" class="h3">자주 쓰는 질문 등록하기</h3>
+      <p class="muted small">방금 실행한 질문과 SQL을 이름을 붙여 위의 «자주 쓰는 질문» 목록에 더합니다. 등록한 질문은 이 브라우저에 남고, 내보내기로 다른 사람과 나눌 수 있습니다. 읽기 전용 검사를 통과한 SQL만 등록됩니다.</p>
+      <div class="row save-row">
+        <label class="lbl" for="save-name">이름</label>
+        <input id="save-name" type="text" maxlength="60" placeholder="예: 설비별 fail 건수 상위 5">
+        <button id="sql-save" class="btn primary" type="button">자주 쓰는 질문 등록하기</button>
+        <span id="save-status" class="muted" role="status"></span>
+      </div>
+      <div class="row">
+        <button id="freq-export" class="btn small-btn" type="button">내보내기(JSON)</button>
+        <label class="btn small-btn" for="freq-import">가져오기(JSON)</label>
+        <input id="freq-import" type="file" accept=".json,application/json" hidden>
+        <span id="freq-io-status" class="muted small" role="status"></span>
+      </div>
+    </section>
   </section>
 
 
@@ -146,6 +162,7 @@
 <script src="js/builder.js"></script>
 <script src="js/precheck.js"></script>
 <script src="js/ask.js"></script>
+<script src="js/freq.js"></script>
 <script src="js/app.js"></script>
 <script type="module" src="js/db.js"></script>
 </body>
