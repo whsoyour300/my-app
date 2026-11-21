@@ -77,6 +77,7 @@
     card.meta.textContent = '계산한 시각 ' + rec.at + ' · ' + rec.rows.length + '행 · 읽은 테이블 ' + (rec.tables.join(', ') || '없음') + ' · ' + rec.ms + 'ms';
     card.meta.hidden = false;
     UI.renderTable(card.table, rec.columns, rec.rows, MAX_SHOW_ROWS);
+    if (window.Charts) Charts.render(card.chart, rec.columns, rec.rows, card.charts);
   }
 
   async function recompute(item) {
@@ -150,6 +151,9 @@
     var meta = el('p', 'pmeta');
     meta.hidden = true;
     art.appendChild(meta);
+    var chart = el('div', 'charts');
+    chart.hidden = true;
+    art.appendChild(chart);
     var table = el('div', 'tw');
     art.appendChild(table);
 
@@ -163,7 +167,7 @@
       opts.notes.forEach(function (n) { ul.appendChild(el('li', null, n)); });
       art.appendChild(ul);
     }
-    cards[item.id] = { button: btn, status: status, meta: meta, table: table };
+    cards[item.id] = { button: btn, status: status, meta: meta, table: table, chart: chart, charts: item.charts };
     if (results[item.id]) showResult(cards[item.id], results[item.id]);
     return art;
   }

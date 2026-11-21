@@ -6,7 +6,11 @@
       "id": "q1-item-rates",
       "title": "시험 항목별 첫 시도 fail률 · 재시험률 · 재시험 통과율",
       "question": "시험 항목별로 첫 시도 fail률, 재시험률, 재시험 통과율을 보여줘. 재시험률은 첫 시도가 fail인 건 중 재시험을 한 비율이야",
-      "metrics": ["fail률", "재시험률", "재시험 통과율"],
+      "metrics": [
+        "fail률",
+        "재시험률",
+        "재시험 통과율"
+      ],
       "notes": [
         "fail률은 첫 시도(attempt = 1) 기준입니다. 재시험(attempt = 2)은 섞지 않습니다.",
         "재시험률의 분모는 첫 시도 fail 건수, 분자는 그중 attempt = 2 행이 있는 건수입니다. (로트, 시험 항목) 단위로 짝지어 센 값입니다.",
@@ -43,13 +47,35 @@
         "  ROUND(c.pass2 * 1.0 / NULLIF(c.n2, 0), 4) AS \"재시험 통과율\"",
         "FROM a LEFT JOIN b USING (test_item) LEFT JOIN c USING (test_item)",
         "ORDER BY \"첫 시도 fail률\" DESC, \"시험 항목\""
+      ],
+      "charts": [
+        {
+          "type": "bar",
+          "title": "시험 항목별 비율 (첫 시도 fail률 · 재시험률 · 재시험 통과율)",
+          "y": [
+            "첫 시도 fail률",
+            "재시험률",
+            "재시험 통과율"
+          ]
+        },
+        {
+          "type": "bar",
+          "title": "시험 항목별 건수 (첫 시도 fail · 재시험 · 재시험 pass)",
+          "y": [
+            "첫 시도 fail 건수",
+            "재시험 건수",
+            "재시험 pass 건수"
+          ]
+        }
       ]
     },
     {
       "id": "q2-monthly-fail",
       "title": "월별 첫 시도 fail률 (전체 · 전기특성)",
       "question": "월별 시험 첫 시도 fail률을 전체와 전기특성으로 나눠 보여줘",
-      "metrics": ["fail률"],
+      "metrics": [
+        "fail률"
+      ],
       "notes": [
         "월은 시험일(test_date) 기준이고 첫 시도(attempt = 1)만 셉니다.",
         "마지막 달(2026-01)은 1월 27일 이후 투입된 로트의 시험이 아직 없어 덜 채워져 있습니다(데이터 사전 7번). 시험이 없는 로트는 fail이 아니라 미확정이라 분모에서 빠집니다.",
@@ -68,6 +94,16 @@
         "WHERE attempt = 1",
         "GROUP BY strftime(test_date, '%Y-%m')",
         "ORDER BY \"월\""
+      ],
+      "charts": [
+        {
+          "type": "line",
+          "title": "월별 첫 시도 fail률 (전체 · 전기특성)",
+          "y": [
+            "전체 fail률",
+            "전기특성 fail률"
+          ]
+        }
       ]
     },
     {
@@ -97,6 +133,18 @@
         "  g.logs AS \"정비 이력(정비일 종류)\"",
         "FROM v FULL OUTER JOIN g ON v.m = g.m",
         "ORDER BY \"월\""
+      ],
+      "charts": [
+        {
+          "type": "combo",
+          "title": "EQ16 월별 평균 진동(선)과 정비 건수(막대)",
+          "line": [
+            "평균 진동(mm/s)"
+          ],
+          "bar": [
+            "정비 건수"
+          ]
+        }
       ]
     }
   ]

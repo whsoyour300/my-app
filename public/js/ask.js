@@ -103,6 +103,7 @@
     $('res-meta').textContent = '(' + res.rows.length + '행)';
     renderTable($('res-table'), res.columns, res.rows, MAX_SHOW_ROWS);
     show($('res'), true);
+    if (window.Charts) window.Charts.render($('res-chart'), res.columns, res.rows);
     run.disabled = false;
 
     // 여기서부터는 결과를 그대로 둔 채 ①과 ②만 덧붙인다. 어느 쪽이 실패해도 위의 결과는 지워지지 않는다.

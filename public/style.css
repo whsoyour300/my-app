@@ -149,4 +149,11 @@ input[type="text"]:focus-visible{outline:2px solid var(--accent);outline-offset:
 .erd-notes b{color:var(--fg);font-weight:600}
 .pcard.flash{box-shadow:0 0 0 3px var(--accent)}
 
+/* 결과 차트 */
+.charts{display:flex;flex-direction:column;gap:14px;margin:4px 0 6px}
+.charts[hidden]{display:none}
+.chart-box{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px 10px}
+.chart-box figcaption{font-size:14.5px;font-weight:600;margin-bottom:6px}
+.chart-holder{position:relative;width:100%}
+
 @media (max-width:560px){body{font-size:15px}h1{font-size:21px}}
