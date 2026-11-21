@@ -1,15 +1,16 @@
 // 화면 공용 도구. AI 나 파일에서 온 글자는 textContent 로만 넣는다.
 (function (root) {
-  function renderTable(box, columns, rows, limit) {
+  function renderTable(box, columns, rows, limit, decimals) {
     box.textContent = '';
     var table = document.createElement('table'), head = document.createElement('tr');
     columns.forEach(function (c) { var th = document.createElement('th'); th.textContent = c; head.appendChild(th); });
     table.appendChild(head);
     rows.slice(0, limit).forEach(function (r) {
       var tr = document.createElement('tr');
-      r.forEach(function (v) {
+      r.forEach(function (v, ci) {
         var td = document.createElement('td');
-        td.textContent = v === null || v === undefined ? '' : String(v);
+        var dec = decimals ? decimals[ci] : null;
+        td.textContent = v === null || v === undefined ? '' : (typeof v === 'number' && dec !== null && dec !== undefined ? v.toFixed(dec) : String(v));
         if (typeof v === 'number') td.className = 'num';
         tr.appendChild(td);
       });

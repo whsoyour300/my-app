@@ -30,7 +30,9 @@
   function color(i) { var c = COLORS[i % COLORS.length]; return c.charAt(0) === '-' ? cssVar(c) : c; }
   function isNum(v) { return typeof v === 'number' && isFinite(v); }
   function fmtNum(v) { return isNum(v) ? v.toLocaleString('ko-KR', { maximumFractionDigits: 4 }) : String(v); }
-  function fmtPct(v) { return isNum(v) ? (v * 100).toLocaleString('ko-KR', { maximumFractionDigits: 2 }) + '%' : String(v); }
+  // 비율은 % 로, 소수점 첫째 자리까지 반올림한다.
+  function fmtPct(v) { return isNum(v) ? (Math.round(v * 1000) / 10).toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%' : String(v); }
+  function fmtPctTick(v) { return isNum(v) ? (Math.round(v * 1000) / 10).toLocaleString('ko-KR', { maximumFractionDigits: 1 }) + '%' : String(v); }
 
   function colInfo(columns, rows) {
     return columns.map(function (name, i) {
@@ -167,7 +169,7 @@
     var dual = sp.series.some(function (s) { return s.axis === 'y1'; });
     function axisOf(pos, show, isPct, grid) {
       return { position: pos, beginAtZero: true, grid: { display: grid, color: line }, border: { display: false },
-        ticks: { color: muted, callback: function (v) { return isPct ? fmtPct(v) : fmtNum(v); } },
+        ticks: { color: muted, callback: function (v) { return isPct ? fmtPctTick(v) : fmtNum(v); } },
         title: { display: show, color: muted, text: '' } };
     }
     var scales = {};
@@ -252,5 +254,8 @@
     live.set(box, made);
   }
 
-  root.Charts = { render: render, clear: destroy, _analyze: analyze };
+  // 표에서 비율 컬럼을 %로 보여 줄 때 쓴다: 어느 컬럼이 비율인지(0~1 사이의 숫자이고 이름이 률·비율 등).
+  function rateColumns(columns, rows) { return colInfo(columns, rows).map(function (i) { return i.rate; }); }
+
+  root.Charts = { render: render, clear: destroy, rateColumns: rateColumns, _analyze: analyze };
 })(typeof window !== 'undefined' ? window : globalThis);
