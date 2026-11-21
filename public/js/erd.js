@@ -64,6 +64,15 @@
     });
   }
 
+  // 우하단 범례: 처음 보는 사람을 위한 용어 설명(흐리고 작게)
+  function legend(svg) {
+    var L = ['PK(기본키): 한 행을 딱 하나로 가리키는 값. 겹치지 않습니다.',
+             'FK(외래키): 다른 테이블의 PK를 가리켜 두 테이블을 잇는 값.',
+             '선 끝의 1 · N · 4 · 4~8: 그쪽 테이블에 달리는 행 수.',
+             '표시는 schema.json 설명 기준이며 DB에 설정된 제약은 아닙니다.'];
+    L.forEach(function (t, i) { e('text', { x: 830, y: 584 + i * 17, 'class': 'erd-legend', 'text-anchor': 'end' }, t, svg); });
+  }
+
   function go(name) {
     var card = document.getElementById('tbl-' + name);
     if (card) { card.scrollIntoView({ behavior: 'smooth', block: 'start' }); card.classList.add('flash'); setTimeout(function () { card.classList.remove('flash'); }, 1400); }
@@ -71,8 +80,9 @@
 
   var box = document.getElementById('erd');
   if (!box) return;
-  var svg = e('svg', { viewBox: '0 0 850 570', role: 'img', 'aria-label': '테이블 연결관계 모식도: 로트가 공정 이력과 시험 결과로 이어지고, 공정 이력은 설비로, 설비는 일별 센서와 정비 이력으로 이어진다' });
+  var svg = e('svg', { viewBox: '0 0 850 650', role: 'img', 'aria-label': '테이블 연결관계 모식도: 로트가 공정 이력과 시험 결과로 이어지고, 공정 이력은 설비로, 설비는 일별 센서와 정비 이력으로 이어진다' });
   draw(svg);
+  legend(svg);
   box.appendChild(svg);
   box.addEventListener('click', function (ev) { var a = ev.target.closest('[data-go]'); if (a) go(a.getAttribute('data-go')); });
   box.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { var a = ev.target.closest('[data-go]'); if (a) go(a.getAttribute('data-go')); } });
