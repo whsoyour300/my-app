@@ -85,6 +85,38 @@
     return { text: lines.join('\n'), warn: warn };
   }
 
+  // ---- 실측 (사전 점검용) ----
+  // 고른 기간 · 정의로 지금 올라와 있는 데이터를 세어 본 값. 나누기(기준) 전의 전체 기준이다. 집계 숫자만 만들고 행은 읽어 내보내지 않는다.
+  async function facts(st) {
+    var Db = root.Db;
+    if (!Db || Db.state !== 'ready' || !ISO.test(st.from || '') || !ISO.test(st.to || '') || st.from > st.to) return null;
+    var w = "test_date >= DATE '" + st.from + "' AND test_date <= DATE '" + st.to + "'";
+    var wa = w.replace(/test_date/g, 'a.test_date');
+    var r = await Db.query("SELECT COUNT(*), COUNT(*) FILTER (WHERE attempt = 1), COUNT(*) FILTER (WHERE attempt = 1 AND result = 'fail'), " +
+      "COUNT(*) FILTER (WHERE attempt = 2), COUNT(*) FILTER (WHERE attempt = 2 AND result = 'pass'), COUNT(*) FILTER (WHERE result = 'fail'), " +
+      "COALESCE(SUM(defect_qty) FILTER (WHERE attempt = 1), 0) FROM test_results WHERE " + w);
+    var v = r.rows[0].map(Number);
+    var vals = { all: v[0], try1: v[1], fail1: v[2], try2: v[3], pass2: v[4], failAll: v[5], defect: v[6] };
+    var rr = await Db.query("SELECT COUNT(*) FROM test_results a WHERE a.attempt = 1 AND a.result = 'fail' AND " + wa +
+      " AND EXISTS (SELECT 1 FROM test_results b WHERE b.lot_id = a.lot_id AND b.test_item = a.test_item AND b.attempt = 2)");
+    vals.retry = Number(rr.rows[0][0]);
+    var N = NUMS[st.num], D = DENS[st.den];
+    var nv = vals[st.num], dv = st.den === 'tryAll' ? vals.all : vals[st.den];
+    var out = {
+      period: { from: st.from, to: st.to },
+      tests_all: vals.all, first_try: vals.try1,
+      numerator: { name: N.ko, value: nv }, denominator: { name: D.ko, value: dv },
+      ratio_percent: dv > 0 ? Math.round(nv / dv * 1000) / 10 : null
+    };
+    var hasEquip = st.dims.some(function (k) { return k === 'equip_id' || k === 'equip_type' || k === 'vendor'; });
+    if (hasEquip && st.dims.indexOf('step') < 0) {
+      var j = await Db.query("SELECT COUNT(*) FROM test_results t JOIN process_runs p ON p.lot_id = t.lot_id WHERE t.attempt = 1 AND " + w.replace(/test_date/g, 't.test_date'));
+      var after = Number(j.rows[0][0]);
+      out.join_without_step = { rows_before: vals.try1, rows_after: after, multiplier: vals.try1 > 0 ? Math.round(after / vals.try1 * 10) / 10 : null };
+    }
+    return out;
+  }
+
   // ---- 화면 ----
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
 
@@ -171,6 +203,7 @@
       if (dirty && !force) { msg.textContent = '직접 고친 문장이라 옵션을 바꿔도 덮어쓰지 않습니다. 옵션대로 다시 쓰려면 «문장 다시 만들기»를 누르세요.'; return; }
       q.value = r.text;
       dirty = false;
+      root.Builder.current = { state: JSON.parse(JSON.stringify(st)), text: r.text };
       q.dispatchEvent(new CustomEvent('builder-write'));   // 이전 점검 · 최종 결정을 무효로 한다
       msg.textContent = r.warn || '옵션대로 문장을 만들었습니다. 필요하면 질문 칸에서 고친 뒤 «SQL 만들기»를 누르세요.';
       if (r.warn) msg.className = 'small b-msg warn';
@@ -225,7 +258,7 @@
     loadFromData();
   }
 
-  root.Builder = { range: null, compose: compose, addMonths: addMonths, DIMS: DIMS, CMPS: CMPS, NUMS: NUMS, DENS: DENS, COMBOS: COMBOS };
+  root.Builder = { range: null, current: null, facts: facts, compose: compose, addMonths: addMonths, DIMS: DIMS, CMPS: CMPS, NUMS: NUMS, DENS: DENS, COMBOS: COMBOS };
   if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
   }

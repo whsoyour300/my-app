@@ -58,10 +58,14 @@
         var li = el('li', i.level);
         li.appendChild(el('b', null, i.level === 'error' ? '모순 ' : i.level === 'info' ? '참고 ' : '주의 '));
         li.appendChild(document.createTextNode(i.text));
+        // 주의 · 모순 밑에: 이 문장 그대로 실행하면 어떻게 되는지(예상 결과)와 어떻게 고치면 되는지(수정 예시)
+        if (i.expected) { var e1 = el('div', 'check-sub'); e1.appendChild(el('span', 'sub-tag', '예상 결과')); e1.appendChild(document.createTextNode(i.expected)); li.appendChild(e1); }
+        if (i.fix) { var e2 = el('div', 'check-sub fix'); e2.appendChild(el('span', 'sub-tag', '수정 예시')); e2.appendChild(document.createTextNode(i.fix)); li.appendChild(e2); }
         ul.appendChild(li);
       });
       box.appendChild(ul);
     }
+    renderFacts(res.facts);
     var changed = res.revised && res.revised !== text;
     var acts = el('div', 'row');
     if (changed) {
@@ -80,6 +84,38 @@
       if (issues.length) box.appendChild(el('p', 'muted small', 'AI 가 고칠 문장을 만들지 못했습니다. 위 항목을 보고 질문이나 조건을 직접 고칠 수도 있습니다.'));
     }
     box.appendChild(acts);
+  }
+
+  // 브라우저가 실제 데이터에서 센 값(나누기 전 전체 기준). AI 가 쓴 말이 아니라 계산한 숫자다.
+  function fmt(n) { return Number(n).toLocaleString('ko-KR'); }
+  function renderFacts(f) {
+    if (!f) return;
+    var lines = [];
+    if (f.period) {
+      var rg = root.Builder && root.Builder.range;
+      var t = f.period.from + ' ~ ' + f.period.to + ' 기간의 시험: 첫 시도 ' + fmt(f.first_try) + '건 (모든 시도 ' + fmt(f.tests_all) + '건)';
+      if (!f.first_try) t += ' → 이 기간에는 읽을 데이터가 없어 결과가 비어 나옵니다' + (rg && rg.min ? ' (데이터 범위 ' + rg.min + ' ~ ' + rg.max + ')' : '');
+      lines.push(t);
+    }
+    if (f.numerator && f.denominator) {
+      var t2 = '정의대로 전체를 한 값으로 세면: ' + f.numerator.name + ' ' + fmt(f.numerator.value) + ' ÷ ' + f.denominator.name + ' ' + fmt(f.denominator.value);
+      if (f.ratio_percent === null || f.ratio_percent === undefined) t2 += ' → 분모가 0이라 계산되지 않습니다';
+      else {
+        t2 += ' = ' + f.ratio_percent.toLocaleString('ko-KR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+        if (f.ratio_percent > 100) t2 += ' → 100%를 넘습니다. 분자와 분모의 범위가 맞지 않는다는 뜻입니다';
+      }
+      lines.push(t2);
+    }
+    if (f.join_without_step && f.join_without_step.multiplier) {
+      lines.push('설비로 나누면서 공정을 정하지 않으면 시험 ' + fmt(f.join_without_step.rows_before) + '행이 ' + fmt(f.join_without_step.rows_after) + '행(약 ' + f.join_without_step.multiplier + '배)으로 늘어나 건수가 부풀려집니다');
+    }
+    if (!lines.length) return;
+    var fb = el('div', 'check-facts');
+    fb.appendChild(el('div', 'lbl', '현재 조건으로 실행하면 (실제 데이터를 센 값, 나누기 전 전체 기준)'));
+    var ul = el('ul', 'check-list');
+    lines.forEach(function (l) { ul.appendChild(el('li', null, l)); });
+    fb.appendChild(ul);
+    box.appendChild(fb);
   }
 
   function renderError(msg, text) {
@@ -103,8 +139,13 @@
     box.hidden = true;
     var range = root.Builder && root.Builder.range && root.Builder.range.min ? root.Builder.range : null;
     var extra = root.Files ? root.Files.describe() : [];
-    fetch('/api/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, data_range: range, extra_tables: extra }) })
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    // 조건 도우미로 만든 문장 그대로일 때만, 그 조건으로 데이터를 세어 본 값(facts)을 함께 보낸다.
+    var cur = root.Builder && root.Builder.current;
+    var factsP = cur && cur.text.trim() === text ? root.Builder.facts(cur.state).catch(function () { return null; }) : Promise.resolve(null);
+    factsP.then(function (facts) {
+      return fetch('/api/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, data_range: range, facts: facts, extra_tables: extra }) })
+        .then(function (r) { return r.json().then(function (j) { j.facts = facts; return { ok: r.ok, j: j }; }); });
+    })
       .then(function (res) {
         if (my !== seq) return;       // 점검 도중 질문이 바뀌었으면 결과를 버린다
         if (!res.ok) throw new Error(res.j.error || '요청에 실패했습니다.');

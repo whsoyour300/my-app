@@ -36,9 +36,17 @@ SYSTEM = """너는 데이터 분석 질문을 실행 전에 점검하는 검토�
   사용자가 정해야 하는 것(예: 어떤 공정을 쓸지)은 지어내서 고치지 않고 issues 에만 적는다.
   고칠 것이 없으면 revised 는 질문 문장 그대로(한 글자도 바꾸지 말 것)로 한다.
 - summary 는 점검 결과를 한 줄로 쓴다.
+- 입력의 facts 는 이 질문의 기간 · 정의를 브라우저가 실제 데이터에서 센 값이다(기준으로 나누기 전의 전체 기준).
+  error · warn 인 issue 마다 아래 둘을 쓴다.
+  · expected: 이 문장 그대로 실행하면 어떤 결과가 나올지 한 줄. facts 의 숫자를 인용하되 키 이름(tests_all 등)이 아니라
+    '첫 시도 0건', '1,916행이 7,664행으로' 처럼 한국어로 풀어 쓴다. facts 에 없는 숫자는 만들지 않는다.
+    숫자를 모르면 어느 쪽으로 틀어지는지만 쓴다(예: '비율이 100%를 넘을 수 있음', '건수가 부풀려짐', '결과가 빈 표로 나옴').
+  · fix: 어떻게 고치면 되는지 예시. 바꿀 줄의 새 내용만 적는다(예: '기간: 2025-10-31 ~ 2026-01-31', '기준: 설비명(equip_id), 공정(step)별로 나눠서').
+    '로 바꾸기' 같은 말은 붙이지 않는다. 기간을 고칠 때는 data_range 안에서(가능하면 가장 최근 3달) 예를 든다.
+    사용자가 정해야 하는 값이면 '예) …'로 후보를 든다. info 는 expected · fix 를 비워도 된다.
 
 답은 JSON 객체 하나로만 한다:
-{"issues": [{"level": "error|warn|info", "text": "<한 줄>"}],
+{"issues": [{"level": "error|warn|info", "text": "<한 줄>", "expected": "<예상 결과 한 줄>", "fix": "<수정 예시 한 줄>"}],
  "revised": "<점검 뒤 문장>",
  "summary": "<한 줄 결론>"}
 
@@ -69,8 +77,38 @@ def clean_issues(raw):
         if not text:
             continue
         level = x.get("level") if x.get("level") in ("error", "warn", "info") else "warn"
-        out.append({"level": level, "text": text[:240]})
+        item = {"level": level, "text": text[:240]}
+        for k in ("expected", "fix"):
+            v = str(x.get(k) or "").strip()
+            if v:
+                item[k] = v[:260]
+        out.append(item)
     return out
+
+
+def clean_facts(raw):
+    """브라우저가 센 숫자만 받는다(이름 · 숫자). 그 밖의 값은 버린다."""
+    if not isinstance(raw, dict):
+        return None
+
+    def num(v):
+        return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+    out = {}
+    per = raw.get("period")
+    if isinstance(per, dict) and DATE.match(str(per.get("from", ""))) and DATE.match(str(per.get("to", ""))):
+        out["period"] = {"from": per["from"], "to": per["to"]}
+    for k in ("tests_all", "first_try", "ratio_percent"):
+        if num(raw.get(k)) is not None:
+            out[k] = raw[k]
+    for k in ("numerator", "denominator"):
+        v = raw.get(k)
+        if isinstance(v, dict) and isinstance(v.get("name"), str) and num(v.get("value")) is not None:
+            out[k] = {"name": v["name"][:60], "value": v["value"]}
+    j = raw.get("join_without_step")
+    if isinstance(j, dict):
+        out["join_without_step"] = {k: j[k] for k in ("rows_before", "rows_after", "multiplier") if num(j.get(k)) is not None}
+    return out or None
 
 
 class handler(BaseHTTPRequestHandler):
@@ -84,7 +122,7 @@ class handler(BaseHTTPRequestHandler):
             if len(q) > MAX_QUESTION:
                 raise c.ApiError(400, "질문이 너무 깁니다(%d자 이하)." % MAX_QUESTION)
             extra = c.clean_extra_tables(body.get("extra_tables"))
-            user = json.dumps({"question": q, "data_range": clean_range(body.get("data_range"))}, ensure_ascii=False)
+            user = json.dumps({"question": q, "data_range": clean_range(body.get("data_range")), "facts": clean_facts(body.get("facts"))}, ensure_ascii=False)
             out = c.call_gemini(SYSTEM + c.schema_text(c.load_schema(), extra), user)
             if not isinstance(out, dict):
                 raise c.ApiError(502, "AI 답을 읽지 못했습니다.")
