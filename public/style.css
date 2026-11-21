@@ -97,7 +97,7 @@ input[type="text"]:focus-visible{outline:2px solid var(--accent);outline-offset:
 .pcard{box-shadow:0 1px 3px rgba(0,0,0,.05);background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .phead{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
 .ptitle{margin:0;font-size:17px;font-weight:600}
-.pq{color:var(--muted);font-size:15px}
+.pq{color:var(--muted);font-size:15px;white-space:pre-line}
 .pdefs,.pnotes{margin:0;padding-left:18px;font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
 .pdefs b{color:var(--fg);font-weight:600}
 .pmeta.stale{background:var(--warn-soft);color:var(--warn)}

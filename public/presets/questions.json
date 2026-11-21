@@ -146,6 +146,151 @@
           ]
         }
       ]
+    },
+    {
+      "id": "q4-equip-fail-top5",
+      "title": "설비별 첫 시도 fail 건수 상위 5",
+      "question": "기간: 2024-07-06 ~ 2026-01-31 (양 끝 날짜 포함, 시험일 test_date 기준)\n기준: 설비명(equip_id)별로 나눠서 (설비를 거친 로트 기준, 한 설비는 한 공정에만 있어 행이 겹치지 않음)\n비교: 값이 큰 순서로 상위 5개만 순위와 함께 보여줘\n정의: 첫 시도 fail 건수(attempt = 1, result = 'fail')와 첫 시도 fail률 = 첫 시도 fail 건수 ÷ 첫 시도 시험 건수(attempt = 1)를 함께\n위 조건으로 구해줘.",
+      "files": [
+        "test_results",
+        "process_runs"
+      ],
+      "metrics": [
+        "fail률"
+      ],
+      "notes": [
+        "설비의 fail은 «그 설비를 거친 로트의 fail»입니다. 같은 로트의 fail이 그 로트를 거친 설비(공정마다 한 대)마다 한 번씩 잡히므로, 설비가 원인이라는 뜻은 아닙니다.",
+        "동률이면 같은 순위로 모두 보여 주어 5개를 넘을 수 있습니다.",
+        "기간 전체를 한 번 셉니다. 건수 차이가 작아(몇 건) 순위는 기간을 바꾸면 달라질 수 있습니다."
+      ],
+      "charts": [
+        {
+          "type": "bar",
+          "title": "설비별 첫 시도 fail 건수 (상위 5)",
+          "y": [
+            "첫 시도 fail 건수"
+          ]
+        },
+        {
+          "type": "bar",
+          "title": "설비별 첫 시도 fail률",
+          "y": [
+            "첫 시도 fail률"
+          ]
+        }
+      ],
+      "sql": [
+        "SELECT * FROM (",
+        "  SELECT p.equip_id AS \"설비명\",",
+        "    COUNT(*) FILTER (WHERE t.result = 'fail') AS \"첫 시도 fail 건수\",",
+        "    COUNT(*) AS \"첫 시도 시험 건수\",",
+        "    ROUND(COUNT(*) FILTER (WHERE t.result = 'fail') * 1.0 / COUNT(*), 4) AS \"첫 시도 fail률\",",
+        "    RANK() OVER (ORDER BY COUNT(*) FILTER (WHERE t.result = 'fail') DESC) AS \"순위\"",
+        "  FROM test_results t JOIN process_runs p ON p.lot_id = t.lot_id",
+        "  WHERE t.attempt = 1 AND t.test_date >= DATE '2024-07-06' AND t.test_date <= DATE '2026-01-31'",
+        "  GROUP BY p.equip_id",
+        ") WHERE \"순위\" <= 5",
+        "ORDER BY \"순위\", \"설비명\""
+      ]
+    },
+    {
+      "id": "q5-defect-testitem",
+      "title": "defect_type별 fail이 가장 많은 test 항목",
+      "question": "기간: 2024-07-06 ~ 2026-01-31 (양 끝 날짜 포함, 시험일 test_date 기준)\n기준: 불량유형(defect_type), test 항목(test_item)별로 나눠서\n비교: defect_type마다 fail 건수가 가장 많은 test_item만 (동률이면 모두)\n정의: fail 건수(attempt = 1, result = 'fail'). defect_type은 fail 행에만 값이 있음\n위 조건으로 구해줘.",
+      "files": [
+        "test_results"
+      ],
+      "metrics": [],
+      "notes": [
+        "defect_type은 fail 행에만 값이 있어(pass는 NULL) fail 건수만 셉니다.",
+        "동률이면 모두 보여 줍니다."
+      ],
+      "sql": [
+        "WITH c AS (",
+        "  SELECT t.defect_type, t.test_item, COUNT(*) AS n",
+        "  FROM test_results t",
+        "  WHERE t.attempt = 1 AND t.test_date >= DATE '2024-07-06' AND t.test_date <= DATE '2026-01-31' AND t.result = 'fail'",
+        "  GROUP BY t.defect_type, t.test_item",
+        "), r AS (",
+        "  SELECT *, RANK() OVER (PARTITION BY defect_type ORDER BY n DESC) AS rk FROM c",
+        ")",
+        "SELECT defect_type AS \"불량유형\", test_item AS \"test 항목\", n AS \"fail 건수\"",
+        "FROM r WHERE rk = 1",
+        "ORDER BY \"불량유형\", \"test 항목\""
+      ]
+    },
+    {
+      "id": "q6-defect-equip",
+      "title": "defect_type별 fail이 가장 많은 설비",
+      "question": "기간: 2024-07-06 ~ 2026-01-31 (양 끝 날짜 포함, 시험일 test_date 기준)\n기준: 불량유형(defect_type), 설비명(equip_id)별로 나눠서 (설비를 거친 로트 기준)\n비교: defect_type마다 fail 건수가 가장 많은 equip_id만 (동률이면 모두)\n정의: fail 건수(attempt = 1, result = 'fail'). defect_type은 fail 행에만 값이 있음\n위 조건으로 구해줘.",
+      "files": [
+        "test_results",
+        "process_runs"
+      ],
+      "metrics": [],
+      "notes": [
+        "설비의 fail은 «그 설비를 거친 로트의 fail»입니다. 설비가 원인이라는 뜻은 아닙니다.",
+        "defect_type은 fail 행에만 값이 있어(pass는 NULL) fail 건수만 셉니다.",
+        "설비별 건수가 몇 건뿐이라 동률이 많고, 동률이면 모두 보여 줍니다."
+      ],
+      "sql": [
+        "WITH c AS (",
+        "  SELECT t.defect_type, p.equip_id, COUNT(*) AS n",
+        "  FROM test_results t JOIN process_runs p ON p.lot_id = t.lot_id",
+        "  WHERE t.attempt = 1 AND t.test_date >= DATE '2024-07-06' AND t.test_date <= DATE '2026-01-31' AND t.result = 'fail'",
+        "  GROUP BY t.defect_type, p.equip_id",
+        "), r AS (",
+        "  SELECT *, RANK() OVER (PARTITION BY defect_type ORDER BY n DESC) AS rk FROM c",
+        ")",
+        "SELECT defect_type AS \"불량유형\", equip_id AS \"설비명\", n AS \"fail 건수\"",
+        "FROM r WHERE rk = 1",
+        "ORDER BY \"불량유형\", \"설비명\""
+      ]
+    },
+    {
+      "id": "q7-defect-product-rate",
+      "title": "defect_type별 불량 비율이 가장 높은 제품",
+      "question": "기간: 2024-07-06 ~ 2026-01-31 (양 끝 날짜 포함, 시험일 test_date 기준)\n기준: 제품(product), 불량유형(defect_type)별로 나눠서\n비교: defect_type마다 비율이 가장 높은 product 하나\n정의: 불량 비율 = 그 defect_type의 fail 건수(attempt = 1, result = 'fail') ÷ 그 product의 첫 시도 시험 건수(attempt = 1)\n위 조건으로 구해줘.",
+      "files": [
+        "test_results",
+        "lots"
+      ],
+      "metrics": [],
+      "notes": [
+        "분모는 그 제품의 첫 시도 시험 건수 전체(pass 포함)입니다. 제품의 fail 중 그 불량이 차지하는 구성비가 아닙니다.",
+        "비율이 같으면 모두 보여 줍니다."
+      ],
+      "charts": [
+        {
+          "type": "bar",
+          "title": "defect_type별 불량 비율이 가장 높은 제품",
+          "y": [
+            "불량 비율"
+          ]
+        }
+      ],
+      "sql": [
+        "WITH tot AS (",
+        "  SELECT l.product, COUNT(*) AS tests",
+        "  FROM test_results t JOIN lots l ON l.lot_id = t.lot_id",
+        "  WHERE t.attempt = 1 AND t.test_date >= DATE '2024-07-06' AND t.test_date <= DATE '2026-01-31'",
+        "  GROUP BY l.product",
+        "), f AS (",
+        "  SELECT l.product, t.defect_type, COUNT(*) AS n",
+        "  FROM test_results t JOIN lots l ON l.lot_id = t.lot_id",
+        "  WHERE t.attempt = 1 AND t.test_date >= DATE '2024-07-06' AND t.test_date <= DATE '2026-01-31' AND t.result = 'fail'",
+        "  GROUP BY l.product, t.defect_type",
+        "), j AS (",
+        "  SELECT f.defect_type, f.product, f.n, tot.tests, f.n * 1.0 / tot.tests AS rate",
+        "  FROM f JOIN tot ON tot.product = f.product",
+        "), r AS (",
+        "  SELECT *, RANK() OVER (PARTITION BY defect_type ORDER BY rate DESC) AS rk FROM j",
+        ")",
+        "SELECT defect_type AS \"불량유형\", product AS \"제품\", n AS \"불량 건수\",",
+        "  tests AS \"제품 첫 시도 시험 건수\", ROUND(rate, 4) AS \"불량 비율\"",
+        "FROM r WHERE rk = 1",
+        "ORDER BY \"불량유형\", \"제품\""
+      ]
     }
   ]
 }
