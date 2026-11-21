@@ -119,4 +119,26 @@ input[type="text"]:focus-visible{outline:2px solid var(--accent);outline-offset:
 .foot .ok{color:var(--ok)}
 .foot .warn{color:var(--warn)}
 
+/* 테이블 연결관계 모식도 */
+.erd-wrap{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 16px 12px;margin-bottom:8px}
+.erd{overflow-x:auto}
+.erd svg{display:block;width:100%;min-width:640px;height:auto;font-family:var(--font)}
+.erd-line{fill:none;stroke:var(--muted);stroke-width:1.6}
+.erd-card{fill:var(--accent);font-size:13px;font-weight:700}
+.erd-label{fill:var(--muted);font-size:12px;font-family:var(--mono);paint-order:stroke;stroke:var(--surface);stroke-width:4px}
+.erd-box{cursor:pointer;outline:none}
+.erd-body{fill:var(--surface);stroke:var(--line);stroke-width:1.4}
+.erd-head{fill:var(--accent-soft)}
+.erd-box:hover .erd-body,.erd-box:focus-visible .erd-body{stroke:var(--accent);stroke-width:2}
+.erd-name{fill:var(--fg);font-family:var(--mono);font-size:14px;font-weight:700}
+.erd-ko{fill:var(--muted);font-size:12px}
+.erd-col{fill:var(--fg);font-family:var(--mono);font-size:12.5px}
+.erd-col.key{font-weight:700}
+.erd-tag{font-size:11px;font-weight:700}
+.erd-tag.pk{fill:var(--accent)}
+.erd-tag.fk{fill:var(--warn)}
+.erd-notes{margin:10px 0 0;padding-left:18px;font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+.erd-notes b{color:var(--fg);font-weight:600}
+.pcard.flash{box-shadow:0 0 0 3px var(--accent)}
+
 @media (max-width:560px){body{font-size:15px}h1{font-size:21px}}

@@ -86,6 +86,15 @@
   <section id="panel-tables" role="tabpanel" aria-labelledby="tab-tables" class="panel" hidden>
     <h2>테이블</h2>
     <p class="muted">지금 이 브라우저에 올라와 있는 테이블입니다. 내 파일 탭에서 올린 테이블도 여기에 더해집니다.</p>
+    <h3 class="h3">연결관계</h3>
+    <div class="erd-wrap">
+      <div id="erd" class="erd"></div>
+      <ul class="erd-notes">
+        <li><b>읽는 길</b>: 시험 결과 → 로트 → 공정 이력 → 설비 → 일별 센서 · 정비 이력. 선 위의 글자는 이어 주는 컬럼이고, 선 끝의 1 · N · 4 · 4~8 은 한쪽에 몇 행이 달리는지입니다.</li>
+        <li><b>공정 이력을 붙일 때</b>: 로트 하나에 공정 이력이 4행(공정마다 1행)이라, 시험 결과와 lot_id 만으로 붙이면 행이 4배가 됩니다. 반드시 step 조건으로 한 공정만 붙입니다.</li>
+        <li>상자를 누르면 아래 해당 테이블 설명으로 이동합니다. 내 파일 탭에서 올린 테이블은 이 모식도에 나오지 않고 아래 목록에만 더해집니다.</li>
+      </ul>
+    </div>
     <h3 class="h3">테이블 <span id="tables-count" class="muted"></span></h3>
     <div id="tables-list" class="plist"><div class="empty">DuckDB 를 준비하는 중입니다.</div></div>
   </section>
@@ -119,6 +128,7 @@
 <script src="js/ui.js"></script>
 <script src="js/presets.js"></script>
 <script src="js/files.js"></script>
+<script src="js/erd.js"></script>
 <script src="js/tables.js"></script>
 <script src="js/ask.js"></script>
 <script src="js/app.js"></script>
