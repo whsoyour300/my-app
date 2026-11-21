@@ -76,12 +76,7 @@
     card.meta.classList.remove('stale');
     card.meta.textContent = '계산한 시각 ' + rec.at + ' · ' + rec.rows.length + '행 · 읽은 테이블 ' + (rec.tables.join(', ') || '없음') + ' · ' + rec.ms + 'ms';
     card.meta.hidden = false;
-    // 비율 컬럼(0~1)은 %로 바꿔 소수점 첫째 자리까지 반올림해 보여 주고, 단위는 컬럼 이름에만 붙인다. 계산한 값(rec)은 그대로 둔다.
-    var rate = window.Charts ? Charts.rateColumns(rec.columns, rec.rows) : [];
-    var cols = rec.columns.map(function (n, i) { return rate[i] && !/[%％]/.test(n) ? n + ' [%]' : n; });
-    var dec = rec.columns.map(function (n, i) { return rate[i] ? 1 : null; });
-    var shown = rec.rows.map(function (r) { return r.map(function (v, i) { return rate[i] && typeof v === 'number' ? Math.round(v * 1000) / 10 : v; }); });
-    UI.renderTable(card.table, cols, shown, MAX_SHOW_ROWS, dec);
+    UI.renderResultTable(card.table, rec.columns, rec.rows, MAX_SHOW_ROWS);
     if (window.Charts) Charts.render(card.chart, rec.columns, rec.rows, card.charts);
   }
 

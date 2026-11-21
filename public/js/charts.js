@@ -8,6 +8,7 @@
   var RATE_NAME = /률|비율|비중|rate|ratio|pct|percent/i;
   var AVG_NAME = /평균|avg|mean|average/i;
   var TIME_LABEL_NAME = /^(연도|연|년|year|월|month|주|주차|week|일|day|분기|quarter)$/i;
+  var ROWNO = '\u0000row';   // X축 '행 번호' 선택값
   var libPromise = null;
   var live = new WeakMap();   // 상자 → 그려 둔 Chart 들
   var seqs = new WeakMap();   // 상자 → 가장 최근 요청 번호(늦게 끝난 이전 요청은 버린다)
@@ -213,29 +214,57 @@
     };
   }
 
-  function destroy(box) {
+  function killCharts(box) {
     (live.get(box) || []).forEach(function (c) { try { c.destroy(); } catch (e) {} });
     live.delete(box);
+  }
+  function destroy(box) {
+    killCharts(box);
     box.textContent = '';
     box.hidden = true;
   }
 
-  async function render(box, columns, rows, hints) {
-    var seq = (seqs.get(box) || 0) + 1;
-    seqs.set(box, seq);
-    destroy(box);
-    if (!box || !columns || !rows || !rows.length) return;
-    var plan;
-    try { plan = analyze(columns, rows, hints); } catch (e) { return; }
-    if (!plan.charts.length) return;
+  // 사용자가 고른 X · Y · 유형으로 차트 계획을 만든다.
+  function analyzeSel(columns, rows, sel) {
+    var info = colInfo(columns, rows);
+    var xi = sel.x === ROWNO ? -1 : colIndex(columns, sel.x);
+    var all = rows.map(function (r, k) { return xi < 0 ? String(k + 1) : (r[xi] === null || r[xi] === undefined ? '' : String(r[xi])); });
+    var cut = all.length > MAX_LABELS ? '앞 ' + MAX_LABELS + '개 구분만 차트로 그립니다 (전체 ' + all.length + '개).' : '';
+    var labels = all.slice(0, MAX_LABELS);
+    var time = looksTime(all);
+    var line = sel.type === 'line' || (sel.type !== 'bar' && time);
+    var series = [];
+    (sel.y || []).forEach(function (nm) {
+      var i = colIndex(columns, nm);
+      if (i < 0 || i === xi || !info[i].numeric || series.length >= MAX_SERIES) return;
+      series.push({ name: nm, i: i, rate: info[i].rate, max: info[i].max });
+    });
+    if (!series.length) return { charts: [], note: '' };
+    var groups = autoGroups(series), dropped = Math.max(0, groups.length - MAX_CHARTS);
+    var charts = groups.slice(0, MAX_CHARTS).map(function (g) {
+      var ss = g.series.map(function (s) { return Object.assign({}, s, { kind: line ? 'line' : 'bar', axis: 'y', data: dataOf(rows, s.i).slice(0, MAX_LABELS) }); });
+      return { title: ss.map(function (s) { return s.name; }).join(' · '), series: ss, percent: g.rate, labels: labels, time: line };
+    });
+    var note = cut;
+    if (dropped) note += (note ? ' ' : '') + '차트는 ' + MAX_CHARTS + '개까지만 그립니다. 나머지는 표에서 확인하세요.';
+    return { charts: charts, note: note };
+  }
+
+  async function paint(box, outEl, plan, seq) {
+    killCharts(box);
+    outEl.textContent = '';
+    if (!plan.charts.length) {
+      var e0 = document.createElement('p'); e0.className = 'muted small'; e0.textContent = 'Y축에서 숫자 컬럼을 하나 이상 고르세요.'; outEl.appendChild(e0);
+      return;
+    }
     try { await load(); } catch (e) {
       if (seqs.get(box) !== seq) return;
-      box.hidden = false;
-      var m = document.createElement('p'); m.className = 'muted small'; m.textContent = '차트 라이브러리를 불러오지 못해 표만 보여 줍니다.'; box.appendChild(m);
+      var m = document.createElement('p'); m.className = 'muted small'; m.textContent = '차트 라이브러리를 불러오지 못해 표만 보여 줍니다.'; outEl.appendChild(m);
       return;
     }
     if (seqs.get(box) !== seq) return;      // 그 사이 다시 계산했으면 이전 차트는 그리지 않는다
-    box.hidden = false;
+    killCharts(box);                        // 위의 await 동안 다른 그리기가 끼어들었을 때 겹치지 않게
+    outEl.textContent = '';
     var made = [];
     plan.charts.forEach(function (sp) {
       var cfg = chartConfig(sp);
@@ -247,11 +276,91 @@
       var cv = document.createElement('canvas');
       cv.setAttribute('role', 'img');
       cv.setAttribute('aria-label', sp.title + ' 차트. 같은 값은 아래 표에 있습니다.');
-      holder.appendChild(cv); wrap.appendChild(holder); box.appendChild(wrap);
+      holder.appendChild(cv); wrap.appendChild(holder); outEl.appendChild(wrap);
       made.push(new root.Chart(cv, cfg));
     });
-    if (plan.note) { var n = document.createElement('p'); n.className = 'muted small'; n.textContent = plan.note; box.appendChild(n); }
+    if (plan.note) { var n = document.createElement('p'); n.className = 'muted small'; n.textContent = plan.note; outEl.appendChild(n); }
     live.set(box, made);
+  }
+
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+
+  // X · Y · 유형을 고르는 줄. 컬럼 이름은 AI 나 파일에서 올 수 있으니 textContent 로만 넣는다.
+  function buildControls(box, outEl, columns, rows, seq, state) {
+    var info = colInfo(columns, rows);
+    var ctl = el('div', 'chart-ctl');
+    var xSel = el('select'), tSel = el('select'), yBox = el('div', 'chip-row');
+    xSel.setAttribute('aria-label', 'X축');
+    tSel.setAttribute('aria-label', '차트 유형');
+    var opt = function (sel, v, t) { var o = el('option', null, t); o.value = v; sel.appendChild(o); };
+    opt(xSel, ROWNO, '행 번호');
+    columns.forEach(function (c) { opt(xSel, c, c); });
+    [['auto', '자동'], ['bar', '막대'], ['line', '꺾은선']].forEach(function (t) { opt(tSel, t[0], t[1]); });
+    xSel.value = state.x; tSel.value = state.type;
+
+    function field(label, node) { var f = el('label', 'ctl-field'); f.appendChild(el('span', 'ctl-lbl', label)); f.appendChild(node); return f; }
+    ctl.appendChild(field('X축', xSel));
+    ctl.appendChild(field('유형', tSel));
+    var yWrap = el('div', 'ctl-field wide'); yWrap.appendChild(el('span', 'ctl-lbl', 'Y축 (숫자 컬럼, 여러 개 선택)')); yWrap.appendChild(yBox);
+    ctl.appendChild(yWrap);
+    var reset = el('button', 'btn small-btn', '자동으로 되돌리기'); reset.type = 'button';
+    ctl.appendChild(reset);
+
+    function drawY() {
+      yBox.textContent = '';
+      columns.forEach(function (c, i) {
+        if (!info[i].numeric || c === state.x) return;
+        var chip = el('label', 'chip');
+        var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = state.y.indexOf(c) >= 0;
+        cb.addEventListener('change', function () {
+          state.y = state.y.filter(function (n) { return n !== c; });
+          if (cb.checked) state.y.push(c);
+          redraw();
+        });
+        chip.appendChild(cb); chip.appendChild(el('span', null, c)); yBox.appendChild(chip);
+      });
+      if (!yBox.childNodes.length) yBox.appendChild(el('span', 'muted small', '고를 수 있는 숫자 컬럼이 없습니다.'));
+    }
+    function redraw() { paint(box, outEl, analyzeSel(columns, rows, state), seq); }
+    xSel.addEventListener('change', function () { state.x = xSel.value; state.y = state.y.filter(function (n) { return n !== state.x; }); drawY(); redraw(); });
+    tSel.addEventListener('change', function () { state.type = tSel.value; redraw(); });
+    reset.addEventListener('click', function () {
+      var d = state.initial;
+      state.x = d.x; state.y = d.y.slice(); state.type = 'auto'; xSel.value = state.x; tSel.value = 'auto'; drawY();
+      paint(box, outEl, d.plan, seq);
+    });
+    drawY();
+    return ctl;
+  }
+
+  // opts.controls: true 이면 X · Y · 유형을 고르는 줄을 차트 위에 붙인다(묻기 탭).
+  async function render(box, columns, rows, hints, opts) {
+    var seq = (seqs.get(box) || 0) + 1;
+    seqs.set(box, seq);
+    destroy(box);
+    if (!box || !columns || !rows || !rows.length) return;
+    var plan;
+    try { plan = analyze(columns, rows, hints); } catch (e) { return; }
+    var info = colInfo(columns, rows);
+    var hasNum = info.some(function (i) { return i.numeric; });
+    var withCtl = !!(opts && opts.controls) && rows.length >= 2 && hasNum;
+    if (!plan.charts.length && !withCtl) return;
+    box.hidden = false;
+    var outEl = el('div', 'charts-out');
+    if (withCtl) {
+      // 처음 모양은 자동 선택 그대로. 기본 X 는 라벨이 된 첫 컬럼, 기본 Y 는 자동으로 그린 컬럼들.
+      var li = labelsOf(columns, rows, info);
+      var x = li.length ? columns[li[0]] : ROWNO;
+      var ys = [];
+      plan.charts.forEach(function (sp) { sp.series.forEach(function (s) { if (!sp.oneRow && ys.indexOf(s.name) < 0 && s.name !== x) ys.push(s.name); }); });
+      if (!ys.length) info.forEach(function (c, i) { if (c.numeric && columns[i] !== x && ys.length < 3) ys.push(columns[i]); });
+      var state = { x: x, y: ys.slice(), type: 'auto', initial: null };
+      if (!plan.charts.length) plan = analyzeSel(columns, rows, state);
+      state.initial = { x: x, y: ys.slice(), plan: plan };
+      box.appendChild(buildControls(box, outEl, columns, rows, seq, state));
+    }
+    box.appendChild(outEl);
+    await paint(box, outEl, plan, seq);
   }
 
   // 표에서 비율 컬럼을 %로 보여 줄 때 쓴다: 어느 컬럼이 비율인지(0~1 사이의 숫자이고 이름이 률·비율 등).
