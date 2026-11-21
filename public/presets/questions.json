@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "about": "검증한 질문과 SQL. 정의는 docs/데이터_사전.md 그대로다. sql 은 줄 배열(읽기 쉽게)이며 앱이 줄바꿈으로 이어 붙인다.",
+  "questions": [
+    {
+      "id": "q1-item-rates",
+      "title": "시험 항목별 첫 시도 fail률 · 재시험률 · 재시험 통과율",
+      "question": "시험 항목별로 첫 시도 fail률, 재시험률, 재시험 통과율을 보여줘. 재시험률은 첫 시도가 fail인 건 중 재시험을 한 비율이야",
+      "metrics": ["fail률", "재시험률", "재시험 통과율"],
+      "notes": [
+        "fail률은 첫 시도(attempt = 1) 기준입니다. 재시험(attempt = 2)은 섞지 않습니다.",
+        "재시험률의 분모는 첫 시도 fail 건수, 분자는 그중 attempt = 2 행이 있는 건수입니다. (로트, 시험 항목) 단위로 짝지어 센 값입니다.",
+        "재시험 통과율은 attempt = 2 행 중 pass 비율입니다.",
+        "기간 전체(2024-07 ~ 2026-01)를 한 번에 셉니다. 기간 끝에 걸린 재시험 전 건은 재시험률을 낮춥니다."
+      ],
+      "sql": [
+        "WITH first_try AS (",
+        "  SELECT lot_id, test_item, result FROM test_results WHERE attempt = 1",
+        "),",
+        "retry AS (",
+        "  SELECT lot_id, test_item, result FROM test_results WHERE attempt = 2",
+        "),",
+        "a AS (",
+        "  SELECT test_item, COUNT(*) AS n1, COUNT(*) FILTER (WHERE result = 'fail') AS fail1",
+        "  FROM first_try GROUP BY test_item",
+        "),",
+        "b AS (",
+        "  SELECT f.test_item, COUNT(r.lot_id) AS retried",
+        "  FROM first_try f LEFT JOIN retry r ON r.lot_id = f.lot_id AND r.test_item = f.test_item",
+        "  WHERE f.result = 'fail' GROUP BY f.test_item",
+        "),",
+        "c AS (",
+        "  SELECT test_item, COUNT(*) AS n2, COUNT(*) FILTER (WHERE result = 'pass') AS pass2",
+        "  FROM retry GROUP BY test_item",
+        ")",
+        "SELECT a.test_item AS \"시험 항목\",",
+        "  a.n1 AS \"첫 시도 시험 건수\",",
+        "  a.fail1 AS \"첫 시도 fail 건수\",",
+        "  ROUND(a.fail1 * 1.0 / a.n1, 4) AS \"첫 시도 fail률\",",
+        "  b.retried AS \"재시험 건수\",",
+        "  ROUND(b.retried * 1.0 / NULLIF(a.fail1, 0), 4) AS \"재시험률\",",
+        "  c.pass2 AS \"재시험 pass 건수\",",
+        "  ROUND(c.pass2 * 1.0 / NULLIF(c.n2, 0), 4) AS \"재시험 통과율\"",
+        "FROM a LEFT JOIN b USING (test_item) LEFT JOIN c USING (test_item)",
+        "ORDER BY \"첫 시도 fail률\" DESC, \"시험 항목\""
+      ]
+    },
+    {
+      "id": "q2-monthly-fail",
+      "title": "월별 첫 시도 fail률 (전체 · 전기특성)",
+      "question": "월별 시험 첫 시도 fail률을 전체와 전기특성으로 나눠 보여줘",
+      "metrics": ["fail률"],
+      "notes": [
+        "월은 시험일(test_date) 기준이고 첫 시도(attempt = 1)만 셉니다.",
+        "마지막 달(2026-01)은 1월 27일 이후 투입된 로트의 시험이 아직 없어 덜 채워져 있습니다(데이터 사전 7번). 시험이 없는 로트는 fail이 아니라 미확정이라 분모에서 빠집니다.",
+        "전기특성은 시험 항목(test_item) 중 하나입니다. 전체에 전기특성도 포함되어 있습니다."
+      ],
+      "sql": [
+        "SELECT strftime(test_date, '%Y-%m') AS \"월\",",
+        "  COUNT(*) AS \"전체 시험 건수\",",
+        "  COUNT(*) FILTER (WHERE result = 'fail') AS \"전체 fail 건수\",",
+        "  ROUND(COUNT(*) FILTER (WHERE result = 'fail') * 1.0 / COUNT(*), 4) AS \"전체 fail률\",",
+        "  COUNT(*) FILTER (WHERE test_item = '전기특성') AS \"전기특성 시험 건수\",",
+        "  COUNT(*) FILTER (WHERE test_item = '전기특성' AND result = 'fail') AS \"전기특성 fail 건수\",",
+        "  ROUND(COUNT(*) FILTER (WHERE test_item = '전기특성' AND result = 'fail') * 1.0",
+        "        / NULLIF(COUNT(*) FILTER (WHERE test_item = '전기특성'), 0), 4) AS \"전기특성 fail률\"",
+        "FROM test_results",
+        "WHERE attempt = 1",
+        "GROUP BY strftime(test_date, '%Y-%m')",
+        "ORDER BY \"월\""
+      ]
+    },
+    {
+      "id": "q3-eq16-vibration",
+      "title": "설비 EQ16의 월별 평균 진동과 정비 이력",
+      "question": "설비 EQ16의 월별 평균 진동과 정비 이력(정비일, 종류)을 같이 보여줘",
+      "metrics": [],
+      "notes": [
+        "정비 이력은 정비가 있던 날만 행이 있는 이벤트 테이블이라 날짜로 바로 조인하지 않고, 월 단위로 모아서 붙였습니다(데이터 사전 6번).",
+        "정비 이력 칸은 '정비일 종류'를 날짜순으로 쉼표로 이었습니다. 그 달에 정비가 없으면 비어 있습니다.",
+        "센서는 평일만 있어 센서 일수가 달마다 다릅니다. 평균은 센서가 있는 날만으로 계산합니다."
+      ],
+      "sql": [
+        "WITH v AS (",
+        "  SELECT strftime(sensor_date, '%Y-%m') AS m, ROUND(AVG(vibration), 3) AS avg_vib, COUNT(*) AS days",
+        "  FROM equipment_daily WHERE equip_id = 'EQ16' GROUP BY strftime(sensor_date, '%Y-%m')",
+        "),",
+        "g AS (",
+        "  SELECT strftime(log_date, '%Y-%m') AS m, COUNT(*) AS cnt,",
+        "         string_agg(strftime(log_date, '%Y-%m-%d') || ' ' || log_type, ', ' ORDER BY log_date) AS logs",
+        "  FROM maintenance_logs WHERE equip_id = 'EQ16' GROUP BY strftime(log_date, '%Y-%m')",
+        ")",
+        "SELECT COALESCE(v.m, g.m) AS \"월\",",
+        "  v.avg_vib AS \"평균 진동(mm/s)\",",
+        "  v.days AS \"센서 일수\",",
+        "  COALESCE(g.cnt, 0) AS \"정비 건수\",",
+        "  g.logs AS \"정비 이력(정비일 종류)\"",
+        "FROM v FULL OUTER JOIN g ON v.m = g.m",
+        "ORDER BY \"월\""
+      ]
+    }
+  ]
+}

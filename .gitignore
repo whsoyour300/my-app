@@ -1,0 +1,7 @@
+# 비밀 값: 실제 키는 .env 에만 둔다
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.vercel/

@@ -1,0 +1,8 @@
+# 배포에 넣지 않는 것
+.env
+.env.*
+!.env.example
+tools/
+다음달/
+__pycache__/
+*.pyc
