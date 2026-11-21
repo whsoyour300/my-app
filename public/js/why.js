@@ -72,7 +72,7 @@
   // 결과 표(columns, rows)에서 valueCol 합계 대비 가장 큰 행을 찾는다.
   function biggestChunk(columns, rows, valueCol, labelCols) {
     var vi = columns.indexOf(valueCol);
-    if (vi < 0) return { ok: false, reason: '합계 기준 컬럼 "' + valueCol + '" 이 결과에 없어 가장 큰 덩어리를 계산하지 못했습니다.' };
+    if (vi < 0) return { ok: false, reason: '합계 기준 컬럼 "' + valueCol + '" 이 결과에 없어 주요 원인을 계산하지 못했습니다.' };
     var total = 0, best = -1, bestV = -Infinity;
     rows.forEach(function (r, i) {
       var v = r[vi];
@@ -81,7 +81,7 @@
       total += v;
       if (v > bestV) { bestV = v; best = i; }
     });
-    if (best < 0) return { ok: false, reason: '"' + valueCol + '" 에 숫자 값이 없어 가장 큰 덩어리를 계산하지 못했습니다.' };
+    if (best < 0) return { ok: false, reason: '"' + valueCol + '" 에 숫자 값이 없어 주요 원인을 계산하지 못했습니다.' };
     if (total <= 0) return { ok: false, reason: '"' + valueCol + '" 의 합계가 0 이라 비중을 계산할 수 없습니다.' };
     var idx = (labelCols || []).map(function (c) { return columns.indexOf(c); }).filter(function (i) { return i >= 0 && i !== vi; });
     if (!idx.length) { // AI 가 구분 컬럼을 말하지 않았으면 문자 컬럼을 구분 컬럼으로 본다
@@ -102,8 +102,8 @@
   // truncated: 쪼개기 SQL 의 LIMIT 에 걸려 결과가 잘렸을 수 있으면 true. 그러면 합계가 전체가 아닐 수 있다고 알린다.
   function chunkLine(c, truncated) {
     var head = c.ties && c.ties.length > 1
-      ? '가장 큰 덩어리(동률 ' + c.ties.length + '곳): ' + c.ties.join(' / ')
-      : '가장 큰 덩어리: ' + c.label;
+      ? '주요 원인(동률 ' + c.ties.length + '곳): ' + c.ties.join(' / ')
+      : '주요 원인: ' + c.label;
     var tail = ' — ' + c.valueCol + ' ' + fmt(c.value) + (c.ties && c.ties.length > 1 ? ' 각각' : '') + ' (표의 합계 ' + fmt(c.total) + ' 중 ' + pct(c.share) + ')';
     return head + tail + (truncated ? ' ※ 결과가 LIMIT 에서 잘렸을 수 있어 합계가 전체와 다를 수 있습니다.' : '');
   }

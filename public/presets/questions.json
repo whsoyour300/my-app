@@ -291,6 +291,89 @@
         "FROM r WHERE rk = 1",
         "ORDER BY \"불량유형\", \"제품\""
       ]
+    },
+    {
+      "id": "q8-surge-cause-equip",
+      "title": "fail 급증 기간의 원인 후보 설비 (defect_type · lot 수 비교)",
+      "question": "기간: 2024-07-06 ~ 2026-01-31 (양 끝 날짜 포함, 시험일 test_date 기준). 그중 «급증 기간»은 월별 첫 시도 fail률이 월별 평균 + 2 × 표준편차(표본)를 넘는 달\n기준: 설비명(equip_id)별로 나눠서 (설비를 거친 로트 기준), 급증 기간 fail의 defect_type과 lot_id 수를 함께\n비교: 급증 기간이 아닌 달(평소)의 같은 설비 fail률과 비교해, 초과 fail 건수가 큰 순서로 상위 5개 (1위 = 원인이 될 것으로 보이는 설비)\n정의: 초과 fail 건수 = 급증 기간 첫 시도 fail 건수(attempt = 1, result = 'fail') − 급증 기간 첫 시도 시험 건수 × 평소 fail률. lot 수 = 급증 기간에 fail 난 서로 다른 lot_id 의 개수\n위 조건으로 구해줘.",
+      "files": [
+        "test_results",
+        "process_runs"
+      ],
+      "metrics": [],
+      "notes": [
+        "«급증 기간»은 월별 첫 시도 fail률이 (월별 평균 + 2 × 표준편차)를 넘는 달입니다. 이 기준선에는 급증한 달 자신도 평균에 들어가므로 기준선이 조금 높게 잡힙니다. 결과 표의 «급증 기간(월)»에 실제로 뽑힌 달이 나옵니다.",
+        "설비의 fail은 «그 설비를 거친 로트의 fail»입니다. 한 로트가 공정마다 설비를 한 대씩 거치므로 같은 fail이 여러 설비에 잡히고, 설비끼리 순위 차이가 작을 수 있습니다. 1위가 원인이라는 증거가 아니라 먼저 볼 후보입니다.",
+        "초과 fail 건수는 «평소 fail률대로였다면 났을 fail 건수»보다 얼마나 더 났는지입니다. defect_type은 설비마다 급증 기간 fail lot 수가 가장 많은 것 하나이고, 같으면 가나다 순으로 하나를 고릅니다.",
+        "원인 후보의 진동·정비 이력은 «설비 EQ16의 월별 평균 진동과 정비 이력» 질문처럼 설비별로 따로 확인하세요."
+      ],
+      "charts": [
+        {
+          "type": "bar",
+          "title": "설비별 초과 fail 건수 (급증 기간)",
+          "y": [
+            "초과 fail 건수"
+          ]
+        },
+        {
+          "type": "bar",
+          "title": "급증 기간 vs 평소 fail률",
+          "y": [
+            "급증 기간 fail률",
+            "평소 fail률"
+          ]
+        }
+      ],
+      "sql": [
+        "WITH m AS (",
+        "  SELECT strftime(t.test_date, '%Y-%m') AS mon,",
+        "    COUNT(*) FILTER (WHERE t.result = 'fail') * 1.0 / COUNT(*) AS r",
+        "  FROM test_results t",
+        "  WHERE t.attempt = 1 AND t.test_date >= DATE '2024-07-06' AND t.test_date <= DATE '2026-01-31'",
+        "  GROUP BY 1",
+        "), s AS (",
+        "  SELECT AVG(r) AS a, STDDEV_SAMP(r) AS sd FROM m",
+        "), surge AS (",
+        "  SELECT m.mon FROM m, s WHERE m.r > s.a + 2 * s.sd",
+        "), e AS (",
+        "  SELECT p.equip_id, t.lot_id, t.result, t.defect_type,",
+        "    (strftime(t.test_date, '%Y-%m') IN (SELECT mon FROM surge)) AS is_surge",
+        "  FROM test_results t JOIN process_runs p ON p.lot_id = t.lot_id",
+        "  WHERE t.attempt = 1 AND t.test_date >= DATE '2024-07-06' AND t.test_date <= DATE '2026-01-31'",
+        "), agg AS (",
+        "  SELECT equip_id,",
+        "    COUNT(*) FILTER (WHERE is_surge) AS ns,",
+        "    COUNT(*) FILTER (WHERE is_surge AND result = 'fail') AS fs,",
+        "    COUNT(DISTINCT lot_id) FILTER (WHERE is_surge AND result = 'fail') AS lots_s,",
+        "    COUNT(*) FILTER (WHERE NOT is_surge) AS nb,",
+        "    COUNT(*) FILTER (WHERE NOT is_surge AND result = 'fail') AS fb",
+        "  FROM e GROUP BY equip_id",
+        "), dt AS (",
+        "  SELECT equip_id, defect_type, COUNT(DISTINCT lot_id) AS lots",
+        "  FROM e WHERE is_surge AND result = 'fail' GROUP BY equip_id, defect_type",
+        "), topdt AS (",
+        "  SELECT equip_id, defect_type, lots,",
+        "    ROW_NUMBER() OVER (PARTITION BY equip_id ORDER BY lots DESC, defect_type) AS rn",
+        "  FROM dt",
+        "), j AS (",
+        "  SELECT agg.*, topdt.defect_type AS top_dt, topdt.lots AS top_lots,",
+        "    agg.fs - agg.ns * agg.fb * 1.0 / NULLIF(agg.nb, 0) AS excess",
+        "  FROM agg LEFT JOIN topdt ON topdt.equip_id = agg.equip_id AND topdt.rn = 1",
+        "), r AS (",
+        "  SELECT *, RANK() OVER (ORDER BY excess DESC) AS rk FROM j",
+        ")",
+        "SELECT r.equip_id AS \"설비명\", r.rk AS \"순위\",",
+        "  r.lots_s AS \"급증 기간 fail lot 수\",",
+        "  ROUND(r.fs * 1.0 / NULLIF(r.ns, 0), 4) AS \"급증 기간 fail률\",",
+        "  ROUND(r.fb * 1.0 / NULLIF(r.nb, 0), 4) AS \"평소 fail률\",",
+        "  ROUND(r.fs * 1.0 / NULLIF(r.ns, 0) - r.fb * 1.0 / NULLIF(r.nb, 0), 4) AS \"fail률 증가폭(%p)\",",
+        "  ROUND(r.excess, 1) AS \"초과 fail 건수\",",
+        "  r.top_lots AS \"그 defect_type의 lot 수\",",
+        "  r.top_dt AS \"가장 많은 defect_type\",",
+        "  (SELECT string_agg(mon, ', ' ORDER BY mon) FROM surge) AS \"급증 기간(월)\"",
+        "FROM r WHERE r.rk <= 5",
+        "ORDER BY r.rk, r.equip_id"
+      ]
     }
   ]
 }
