@@ -9,7 +9,8 @@
     { key: 'equip_type', ko: '설비군',   col: 'equip_type' },
     { key: 'vendor',     ko: '설비사',   col: 'vendor' },
     { key: 'step',       ko: '공정',     col: 'step' },
-    { key: 'test_item',  ko: 'test 항목', col: 'test_item' }
+    { key: 'test_item',  ko: 'test 항목', col: 'test_item' },
+    { key: 'defect_type', ko: '불량유형', col: 'defect_type' }
   ];
   var CMPS = [
     { key: 'none', label: '비교 없음',                   text: '없음' },
@@ -82,6 +83,8 @@
     var warn = '';
     var hasEquip = st.dims.some(function (k) { return k === 'equip_id' || k === 'equip_type' || k === 'vendor'; });
     if (hasEquip && st.dims.indexOf('step') < 0) warn = '설비로 나눌 때는 «공정»을 한 공정으로 정해 두면 같은 시험이 여러 공정에 겹쳐 세어지지 않아 더 정확합니다.';
+    // 불량유형은 fail 행에만 값이 있다(pass 는 NULL). 분모가 pass 를 포함하면 유형별 비율이 되지 않는다.
+    if (!warn && st.dims.indexOf('defect_type') >= 0) warn = '불량유형(defect_type)은 fail 행에만 값이 있습니다. 불량유형별 fail 건수의 구성비는 의미가 있지만, pass 가 들어가는 분모(시험 건수)는 유형별로 나눌 수 없어 비율은 유형마다 다르게 해석해야 합니다.';
     return { text: lines.join('\n'), warn: warn };
   }
 

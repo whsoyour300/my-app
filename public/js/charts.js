@@ -79,27 +79,6 @@
     return groups;
   }
 
-  // 기준 지표: 차트에 그리는 값들의 전체 평균을 점선으로 같이 그리기 위한 값.
-  // weights 에 가중 컬럼(예: fail률 → 시험 건수)이 있으면 가중 평균(= 합친 값으로 다시 센 비율), 없으면 단순 평균이다.
-  function addRefs(sp, weights, columns, rows, n) {
-    var w = 0, simple = 0;
-    sp.series.forEach(function (s) {
-      var wi = weights[s.name] ? colIndex(columns, weights[s.name]) : -1;
-      var num = 0, den = 0, cnt = 0, sum = 0;
-      rows.slice(0, n).forEach(function (r) {
-        var v = r[s.i];
-        if (!isNum(v)) return;
-        sum += v; cnt++;
-        if (wi >= 0 && isNum(r[wi])) { num += v * r[wi]; den += r[wi]; }
-      });
-      if (wi >= 0 && den > 0) { s.ref = { v: num / den, weighted: true, wname: weights[s.name] }; w++; }
-      else if (cnt) { s.ref = { v: sum / cnt, weighted: false }; simple++; }
-    });
-    if (w || simple) {
-      sp.refText = '점선 = 전체 평균 (' + (w && simple ? '비율은 해당 건수로 가중, 건수는 구분별 단순 평균' : w ? '해당 건수로 가중한 평균, 합쳐서 다시 센 값과 같음' : '구분별 값의 단순 평균') + ')';
-    }
-  }
-
   function analyze(columns, rows, hints) {
     var info = colInfo(columns, rows);
     var labelIdx = labelsOf(columns, rows, info);
@@ -129,11 +108,7 @@
         } else {
           (h.y || []).forEach(function (nm) { var s = seriesOf(nm, { kind: h.type === 'line' ? 'line' : 'bar', axis: 'y' }); if (s) ds.push(s); });
         }
-        if (ds.length) {
-          var sp0 = { title: h.title || ds.map(function (s) { return s.name; }).join(' · '), series: ds, percent: ds.every(function (s) { return s.rate; }) };
-          if (h.avg) addRefs(sp0, h.weights || {}, columns, rows, n);
-          specs.push(sp0);
-        }
+        if (ds.length) specs.push({ title: h.title || ds.map(function (s) { return s.name; }).join(' · '), series: ds, percent: ds.every(function (s) { return s.rate; }) });
       });
       if (specs.length) return finish(specs);
     }
@@ -192,17 +167,6 @@
         };
       });
     }
-    // 기준 지표(전체 평균) 점선. 가로 막대에서는 그리지 않는다.
-    if (!sp.oneRow && !horizontal) {
-      sp.series.forEach(function (s, i) {
-        if (!s.ref || !isNum(s.ref.v)) return;
-        datasets.push({
-          type: 'line', label: '전체 평균 · ' + s.name + ' ' + (s.rate ? fmtPct(s.ref.v) : fmtNum(s.ref.v)),
-          data: sp.labels.map(function () { return s.ref.v; }), yAxisID: s.axis, _ref: true,
-          borderColor: color(i), borderDash: [6, 4], borderWidth: 1.8, pointRadius: 0, pointHoverRadius: 0, pointStyle: 'line', fill: false, order: -1
-        });
-      });
-    }
     var dual = sp.series.some(function (s) { return s.axis === 'y1'; });
     function axisOf(pos, show, isPct, grid) {
       return { position: pos, beginAtZero: true, grid: { display: grid, color: line }, border: { display: false },
@@ -238,7 +202,6 @@
         plugins: {
           legend: { display: sp.legendPos !== 'hidden' && (datasets.length > 1 || !!sp.legendAlways), position: sp.legendPos && sp.legendPos !== 'hidden' ? sp.legendPos : 'top', labels: { color: fg, usePointStyle: true, boxWidth: 8 } },
           tooltip: { callbacks: { label: function (c) {
-            if (c.dataset._ref) return ' ' + c.dataset.label;
             var v = horizontal ? c.parsed.x : c.parsed.y;
             var s = sp.series[c.datasetIndex];
             var p = sp.percent || (s && s.rate);
@@ -362,9 +325,7 @@
       var cv = document.createElement('canvas');
       cv.setAttribute('role', 'img');
       cv.setAttribute('aria-label', sp.title + ' 차트. 같은 값은 아래 표에 있습니다.');
-      holder.appendChild(cv); wrap.appendChild(holder);
-      if (sp.refText && !cfg.horizontal) wrap.appendChild(el('p', 'muted small ref-note', sp.refText));
-      outEl.appendChild(wrap);
+      holder.appendChild(cv); wrap.appendChild(holder); outEl.appendChild(wrap);
       made.push(new root.Chart(cv, cfg));
     });
     if (plan.note) { var n = document.createElement('p'); n.className = 'muted small'; n.textContent = plan.note; outEl.appendChild(n); }
