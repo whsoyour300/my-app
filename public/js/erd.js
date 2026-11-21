@@ -1,4 +1,4 @@
-// «테이블» 탭 위쪽의 연결관계 모식도. schema.json 의 relations 와 같은 내용을 SVG 로 그린다(데이터는 읽지 않는다).
+// «설명서» 탭 위쪽의 연결관계 모식도. schema.json 의 relations 와 같은 내용을 SVG 로 그린다(데이터는 읽지 않는다).
 (function () {
   var NS = 'http://www.w3.org/2000/svg';
   var HEAD = 30, ROW = 22, W = 250;

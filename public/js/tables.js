@@ -1,4 +1,4 @@
-// «테이블» 탭: 지금 이 브라우저의 DuckDB 에 올라와 있는 테이블의 이름 · 컬럼 이름 · 타입 · 행 수.
+// «설명서» 탭: 지금 이 브라우저의 DuckDB 에 올라와 있는 테이블의 이름 · 컬럼 이름 · 타입 · 행 수.
 // 기본 테이블은 schema.json 의 컬럼 뜻을 함께 보여 주고, 올린 파일의 테이블은 뜻이 없다.
 (function () {
   var $ = function (id) { return document.getElementById(id); };
