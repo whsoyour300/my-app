@@ -1,15 +1,15 @@
 // «테이블» 탭 위쪽의 연결관계 모식도. schema.json 의 relations 와 같은 내용을 SVG 로 그린다(데이터는 읽지 않는다).
 (function () {
   var NS = 'http://www.w3.org/2000/svg';
-  var HEAD = 30, ROW = 22, W = 220;
+  var HEAD = 30, ROW = 22, W = 250;
   // 컬럼: [이름, 키 표시]  PK = 한 행을 가리키는 키, FK = 다른 테이블을 가리키는 키
   var T = {
-    lots:             { x: 295, y: 10,  ko: '로트',          cols: [['lot_id', 'PK'], ['product'], ['start_date'], ['qty_in']] },
-    test_results:     { x: 20,  y: 190, ko: '시험 결과',     cols: [['test_id', 'PK'], ['lot_id', 'FK'], ['test_item'], ['attempt'], ['test_date'], ['result'], ['defect_type'], ['defect_qty']] },
-    process_runs:     { x: 295, y: 190, ko: '공정 이력',     cols: [['run_id', 'PK'], ['lot_id', 'FK'], ['step'], ['equip_id', 'FK'], ['run_date'], ['qty_in']] },
-    equipment:        { x: 610, y: 190, ko: '설비',          cols: [['equip_id', 'PK'], ['equip_type'], ['line'], ['vendor'], ['install_date']] },
-    equipment_daily:  { x: 335, y: 400, ko: '일별 센서', cols: [['equip_id', 'FK'], ['sensor_date'], ['vibration'], ['avg_temp'], ['power_kwh']] },
-    maintenance_logs: { x: 610, y: 400, ko: '정비 이력',     cols: [['log_id', 'PK'], ['equip_id', 'FK'], ['log_date'], ['log_type'], ['downtime_h']] }
+    lots:             { x: 300, y: 10,  icon: '📦', ko: '로트',          cols: [['lot_id', 'PK'], ['product'], ['start_date'], ['qty_in']] },
+    test_results:     { x: 20,  y: 190, icon: '🧪', ko: '시험 결과',     cols: [['test_id', 'PK'], ['lot_id', 'FK'], ['test_item'], ['attempt'], ['test_date'], ['result'], ['defect_type'], ['defect_qty']] },
+    process_runs:     { x: 300, y: 190, icon: '⚙️', ko: '공정 이력',     cols: [['run_id', 'PK'], ['lot_id', 'FK'], ['step'], ['equip_id', 'FK'], ['run_date'], ['qty_in']] },
+    equipment:        { x: 640, y: 190, icon: '🏭', ko: '설비',          cols: [['equip_id', 'PK'], ['equip_type'], ['line'], ['vendor'], ['install_date']] },
+    equipment_daily:  { x: 360, y: 400, icon: '📈', ko: '일별 센서', cols: [['equip_id', 'FK'], ['sensor_date'], ['vibration'], ['avg_temp'], ['power_kwh']] },
+    maintenance_logs: { x: 640, y: 400, icon: '🔧', ko: '정비 이력',     cols: [['log_id', 'PK'], ['equip_id', 'FK'], ['log_date'], ['log_type'], ['downtime_h']] }
   };
   function h(t) { return HEAD + T[t].cols.length * ROW + 6; }
   function rowY(t, name) {
@@ -54,7 +54,8 @@
       var t = T[n], g = e('a', { 'class': 'erd-box', 'data-go': n, tabindex: '0', role: 'link', 'aria-label': n + ' 테이블로 이동' }, undefined, gb);
       e('rect', { x: t.x, y: t.y, width: W, height: h(n), rx: 8, 'class': 'erd-body' }, undefined, g);
       e('path', { d: 'M' + t.x + ' ' + (t.y + HEAD) + ' V' + (t.y + 8) + ' a8 8 0 0 1 8 -8 H' + (t.x + W - 8) + ' a8 8 0 0 1 8 8 V' + (t.y + HEAD) + ' Z', 'class': 'erd-head' }, undefined, g);
-      e('text', { x: t.x + 12, y: t.y + 20, 'class': 'erd-name' }, n, g);
+      e('text', { x: t.x + 10, y: t.y + 21, 'class': 'erd-icon' }, t.icon, g);
+      e('text', { x: t.x + 34, y: t.y + 20, 'class': 'erd-name' }, n, g);
       e('text', { x: t.x + W - 12, y: t.y + 20, 'class': 'erd-ko', 'text-anchor': 'end' }, t.ko, g);
       t.cols.forEach(function (c, i) {
         var y = t.y + HEAD + i * ROW + ROW / 2 + 5;
@@ -70,7 +71,7 @@
              'FK(외래키): 다른 테이블의 PK를 가리켜 두 테이블을 잇는 값.',
              '선 끝의 1 · N · 4 · 4~8: 그쪽 테이블에 달리는 행 수.',
              '표시는 schema.json 설명 기준이며 DB에 설정된 제약은 아닙니다.'];
-    L.forEach(function (t, i) { e('text', { x: 830, y: 584 + i * 17, 'class': 'erd-legend', 'text-anchor': 'end' }, t, svg); });
+    L.forEach(function (t, i) { e('text', { x: 890, y: 584 + i * 17, 'class': 'erd-legend', 'text-anchor': 'end' }, t, svg); });
   }
 
   function go(name) {
@@ -80,7 +81,7 @@
 
   var box = document.getElementById('erd');
   if (!box) return;
-  var svg = e('svg', { viewBox: '0 0 850 650', role: 'img', 'aria-label': '테이블 연결관계 모식도: 로트가 공정 이력과 시험 결과로 이어지고, 공정 이력은 설비로, 설비는 일별 센서와 정비 이력으로 이어진다' });
+  var svg = e('svg', { viewBox: '0 0 910 650', role: 'img', 'aria-label': '테이블 연결관계 모식도: 로트가 공정 이력과 시험 결과로 이어지고, 공정 이력은 설비로, 설비는 일별 센서와 정비 이력으로 이어진다' });
   draw(svg);
   legend(svg);
   box.appendChild(svg);

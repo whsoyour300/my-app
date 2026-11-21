@@ -122,7 +122,7 @@ input[type="text"]:focus-visible{outline:2px solid var(--accent);outline-offset:
 /* 테이블 연결관계 모식도 */
 .erd-wrap{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 16px 12px;margin-bottom:8px}
 .erd{overflow-x:auto}
-.erd svg{display:block;width:100%;min-width:640px;height:auto;font-family:var(--font)}
+.erd svg{display:block;width:100%;min-width:680px;height:auto;font-family:var(--font)}
 .erd-line{fill:none;stroke:var(--muted);stroke-width:1.6}
 .erd-card{fill:var(--accent);font-size:13px;font-weight:700}
 .erd-label{fill:var(--muted);font-size:12px;font-family:var(--mono);paint-order:stroke;stroke:var(--surface);stroke-width:4px}
@@ -130,6 +130,7 @@ input[type="text"]:focus-visible{outline:2px solid var(--accent);outline-offset:
 .erd-body{fill:var(--surface);stroke:var(--line);stroke-width:1.4}
 .erd-head{fill:var(--accent-soft)}
 .erd-box:hover .erd-body,.erd-box:focus-visible .erd-body{stroke:var(--accent);stroke-width:2}
+.erd-icon{font-size:15px;font-family:'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif}
 .erd-name{fill:var(--fg);font-family:var(--mono);font-size:14px;font-weight:700}
 .erd-ko{fill:var(--muted);font-size:12px}
 .erd-col{fill:var(--fg);font-family:var(--mono);font-size:12.5px}
